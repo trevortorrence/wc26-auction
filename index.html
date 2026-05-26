@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WC26 Auction Draft</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0A1628; }
+    select option { background: #0D1E35; color: #FAFAF5; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(245,197,24,0.3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ─── THEME ───────────────────────────────────────────────────────────────
+    const C = {
+      navy:    '#0A1628', mid:     '#112240', deep:    '#0D1E35',
+      gold:    '#F5C518', goldDim: 'rgba(245,197,24,0.18)',
+      red:     '#D0021B', grass:   '#1A6B3A',
+      white:   '#FAFAF5', dim:     'rgba(250,250,245,0.55)',
+      faint:   'rgba(250,250,245,0.12)',
+    };
+    const F = {
+      display: "'Bebas Neue', sans-serif",
+      cond:    "'Barlow Condensed', sans-serif",
+      body:    "'Barlow', sans-serif",
+    };
+
+    // ─── DATA ─────────────────────────────────────────────────────────────────
+    const TEAMS = [
+      { name:"France",         rank:1,  flag:"🇫🇷" },
+      { name:"Spain",          rank:2,  flag:"🇪🇸" },
+      { name:"Argentina",      rank:3,  flag:"🇦🇷" },
+      { name:"England",        rank:4,  flag:"🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+      { name:"Portugal",       rank:5,  flag:"🇵🇹" },
+      { name:"Brazil",         rank:6,  flag:"🇧🇷" },
+      { name:"Netherlands",    rank:7,  flag:"🇳🇱" },
+      { name:"Morocco",        rank:8,  flag:"🇲🇦" },
+      { name:"Germany",        rank:9,  flag:"🇩🇪" },
+      { name:"Croatia",        rank:10, flag:"🇭🇷" },
+      { name:"Belgium",        rank:11, flag:"🇧🇪" },
+      { name:"Colombia",       rank:13, flag:"🇨🇴" },
+      { name:"Senegal",        rank:14, flag:"🇸🇳" },
+      { name:"Mexico",         rank:15, flag:"🇲🇽" },
+      { name:"USA",            rank:16, flag:"🇺🇸" },
+      { name:"Uruguay",        rank:17, flag:"🇺🇾" },
+      { name:"Japan",          rank:18, flag:"🇯🇵" },
+      { name:"Denmark",        rank:19, flag:"🇩🇰" },
+      { name:"Serbia",         rank:20, flag:"🇷🇸" },
+      { name:"Iran",           rank:21, flag:"🇮🇷" },
+      { name:"Austria",        rank:22, flag:"🇦🇹" },
+      { name:"Ecuador",        rank:23, flag:"🇪🇨" },
+      { name:"Switzerland",    rank:24, flag:"🇨🇭" },
+      { name:"South Korea",    rank:25, flag:"🇰🇷" },
+      { name:"Norway",         rank:26, flag:"🇳🇴" },
+      { name:"Australia",      rank:27, flag:"🇦🇺" },
+      { name:"Sweden",         rank:28, flag:"🇸🇪" },
+      { name:"Türkiye",        rank:29, flag:"🇹🇷" },
+      { name:"Canada",         rank:30, flag:"🇨🇦" },
+      { name:"Egypt",          rank:33, flag:"🇪🇬" },
+      { name:"Algeria",        rank:36, flag:"🇩🇿" },
+      { name:"Paraguay",       rank:38, flag:"🇵🇾" },
+      { name:"Nigeria",        rank:40, flag:"🇳🇬" },
+      { name:"South Africa",   rank:41, flag:"🇿🇦" },
+      { name:"Czechia",        rank:42, flag:"🇨🇿" },
+      { name:"Bosnia & Herz.", rank:43, flag:"🇧🇦" },
+      { name:"Panama",         rank:44, flag:"🇵🇦" },
+      { name:"Tunisia",        rank:45, flag:"🇹🇳" },
+      { name:"Haiti",          rank:47, flag:"🇭🇹" },
+      { name:"Curaçao",        rank:50, flag:"🇨🇼" },
+      { name:"Qatar",          rank:53, flag:"🇶🇦" },
+      { name:"Iraq",           rank:56, flag:"🇮🇶" },
+      { name:"Uzbekistan",     rank:57, flag:"🇺🇿" },
+      { name:"Saudi Arabia",   rank:58, flag:"🇸🇦" },
+      { name:"Jordan",         rank:64, flag:"🇯🇴" },
+      { name:"Cape Verde",     rank:65, flag:"🇨🇻" },
+      { name:"Congo DR",       rank:70, flag:"🇨🇩" },
+      { name:"New Zealand",    rank:88, flag:"🇳🇿" },
+    ];
+
+    const PLAYER_NAMES = ["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
+    const BUDGET = 100;
+    const TEAMS_PER_PLAYER = 3;
+    const TOTAL_LOTS = PLAYER_NAMES.length * TEAMS_PER_PLAYER; // 39
+
+    const NOM_ORDER = [
+      ...Array.from({length:13},(_,i)=>i),
+      ...Array.from({length:13},(_,i)=>12-i),
+      ...Array.from({length:13},(_,i)=>i),
+    ];
+
+    const INIT_STATE = {
+      phase: 'setup', pin: '',
+      players: PLAYER_NAMES.map(n => ({ name:n, budget:BUDGET, teams:[] })),
+      currentLot: null, nomIndex: 0, soldTeams: {},
+    };
+
+    function shufflePlayers(players) {
+      const arr = [...players];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      const ti = arr.findIndex(p => p.name === 'Trevor');
+      if (ti <= 3) {
+        const swap = 4 + Math.floor(Math.random() * 9);
+        [arr[ti], arr[swap]] = [arr[swap], arr[ti]];
+      }
+      return arr;
+    }
+
+    // ─── FIREBASE STORAGE ────────────────────────────────────────────────────
+    const FB_URL = 'https://wc26-auction-default-rtdb.firebaseio.com/wc26-auction-v1.json';
+
+    async function loadState() {
+      try {
+        const res = await fetch(FB_URL);
+        const data = await res.json();
+        return data || null;
+      } catch { return null; }
+    }
+
+    async function saveState(s) {
+      try {
+        await fetch(FB_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(s),
+        });
+      } catch(e) { console.error('Firebase save failed:', e); }
+    }
+
+    // ─── HELPERS ─────────────────────────────────────────────────────────────
+    const maxBid = (player) => {
+      const remaining = TEAMS_PER_PLAYER - player.teams.length;
+      return remaining <= 0 ? 0 : player.budget - (remaining - 1);
+    };
+    const teamsSold = (soldTeams) => Object.keys(soldTeams).length;
+    const nomName = (players, idx) => players[NOM_ORDER[idx]]?.name || '';
+
+    // ─── STYLES ──────────────────────────────────────────────────────────────
+    const s = {
+      page: { minHeight:'100vh', background:C.navy, color:C.white, fontFamily:F.body },
+      card: (x={}) => ({ background:C.mid, borderRadius:8, padding:16, ...x }),
+      btn: (v='gold', x={}) => {
+        const b = { fontFamily:F.cond, fontWeight:700, fontSize:15, letterSpacing:'0.06em',
+          textTransform:'uppercase', border:'none', borderRadius:4, padding:'10px 20px', cursor:'pointer' };
+        if (v==='gold')  return { ...b, background:C.gold, color:C.navy, ...x };
+        if (v==='red')   return { ...b, background:C.red, color:C.white, ...x };
+        if (v==='ghost') return { ...b, background:'transparent', color:C.dim, border:`1px solid ${C.faint}`, ...x };
+        return b;
+      },
+      input: { background:C.deep, border:`1px solid ${C.faint}`, borderRadius:4,
+        color:C.white, fontFamily:F.body, fontSize:15, padding:'10px 14px',
+        width:'100%', boxSizing:'border-box', outline:'none' },
+      label: { fontFamily:F.cond, fontSize:12, fontWeight:600, letterSpacing:'0.12em',
+        textTransform:'uppercase', color:C.dim, display:'block', marginBottom:6 },
+      heading: (size=32) => ({ fontFamily:F.display, fontSize:size, letterSpacing:'0.02em',
+        color:C.white, lineHeight:1, margin:0 }),
+    };
+
+    // ─── COMPONENTS ──────────────────────────────────────────────────────────
+
+    function Header({ subtitle, right }) {
+      return (
+        <div style={{ background:C.deep, borderBottom:`3px solid ${C.gold}`, padding:'12px 16px',
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          position:'sticky', top:0, zIndex:100 }}>
+          <div>
+            <div style={{ fontFamily:F.display, fontSize:22, color:C.gold, lineHeight:1 }}>⚽ WC26 AUCTION</div>
+            {subtitle && <div style={{ fontFamily:F.cond, fontSize:12, color:C.dim, letterSpacing:'0.08em', marginTop:2 }}>{subtitle}</div>}
+          </div>
+          {right}
+        </div>
+      );
+    }
+
+    function LoadingScreen() {
+      return (
+        <div style={{ ...s.page, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16 }}>
+          <div style={{ fontFamily:F.display, fontSize:48, color:C.gold }}>WC26</div>
+          <div style={{ fontFamily:F.cond, color:C.dim, letterSpacing:'0.15em', fontSize:13 }}>LOADING…</div>
+        </div>
+      );
+    }
+
+    function SetupScreen({ onComplete }) {
+      const [pin, setPin] = useState('');
+      const [err, setErr] = useState('');
+      return (
+        <div style={s.page}>
+          <Header subtitle="COMMISSIONER SETUP" />
+          <div style={{ maxWidth:420, margin:'0 auto', padding:'40px 20px' }}>
+            <div style={{ textAlign:'center', marginBottom:40 }}>
+              <div style={s.heading(52)}>AUCTION</div>
+              <div style={{ ...s.heading(52), color:C.gold }}>DRAFT</div>
+              <div style={{ fontFamily:F.cond, color:C.dim, marginTop:8, fontSize:15 }}>FIFA World Cup 2026 · June 5 at 7:00 PM CT</div>
+            </div>
+            <div style={s.card({ marginBottom:24 })}>
+              <div style={{ fontFamily:F.cond, fontSize:13, color:C.gold, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:12 }}>Commissioner Setup</div>
+              <p style={{ color:C.dim, fontSize:14, margin:'0 0 20px', lineHeight:1.5 }}>
+                Create a PIN to manage the draft. Participants join by selecting their name — no PIN needed.
+              </p>
+              <label style={s.label}>Create Commissioner PIN</label>
+              <input style={s.input} type="password" placeholder="e.g. 2026" value={pin}
+                onChange={e => { setPin(e.target.value); setErr(''); }}
+                onKeyDown={e => e.key==='Enter' && pin.length>=2 && onComplete(pin)} />
+              {err && <div style={{ color:C.red, fontSize:13, marginTop:8 }}>{err}</div>}
+              <button style={{ ...s.btn('gold'), marginTop:16, width:'100%' }}
+                onClick={() => { if (pin.length<2) { setErr('PIN must be at least 2 characters'); return; } onComplete(pin); }}>
+                Create Game →
+              </button>
+            </div>
+            <div style={{ fontFamily:F.cond, fontSize:12, color:C.dim, textAlign:'center', letterSpacing:'0.08em' }}>
+              13 PLAYERS · $100 BUDGET · 39 TEAMS · SNAKE DRAFT ORDER
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LandingScreen({ state, onJoinAsPlayer, onCommissionerLogin }) {
+      const [tab, setTab] = useState('player');
+      const [pin, setPin] = useState('');
+      const [err, setErr] = useState('');
+      return (
+        <div style={s.page}>
+          <Header subtitle={`PHASE: ${state.phase.toUpperCase()}`} />
+          <div style={{ maxWidth:420, margin:'0 auto', padding:'32px 16px' }}>
+            <div style={{ textAlign:'center', marginBottom:32 }}>
+              <div style={s.heading(48)}>WC26 DRAFT</div>
+              <div style={{ fontFamily:F.cond, color:C.dim, fontSize:14, marginTop:6 }}>June 5 · 7:00 PM CT · 13 Players</div>
+            </div>
+            <div style={{ display:'flex', background:C.deep, borderRadius:6, padding:4, marginBottom:24 }}>
+              {['player','commissioner'].map(t => (
+                <button key={t} onClick={() => { setTab(t); setErr(''); }}
+                  style={{ flex:1, border:'none', borderRadius:4, padding:10,
+                    background: tab===t ? C.gold : 'transparent',
+                    color: tab===t ? C.navy : C.dim,
+                    fontFamily:F.cond, fontWeight:700, fontSize:13,
+                    letterSpacing:'0.06em', textTransform:'uppercase', cursor:'pointer' }}>
+                  {t==='player' ? '👤 Join as Player' : '🎛 Commissioner'}
+                </button>
+              ))}
+            </div>
+            {tab==='player' ? (
+              <div style={s.card()}>
+                <label style={s.label}>Select Your Name</label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                  {state.players.map(p => (
+                    <button key={p.name} onClick={() => onJoinAsPlayer(p.name)}
+                      style={{ background:C.deep, border:`1px solid ${C.faint}`, borderRadius:4,
+                        padding:'12px 8px', cursor:'pointer', fontFamily:F.cond, fontWeight:700,
+                        fontSize:15, color:C.white, letterSpacing:'0.04em' }}>
+                      {p.name}
+                      <div style={{ fontFamily:F.body, fontWeight:400, fontSize:12, color:C.dim, marginTop:2 }}>
+                        ${p.budget} · {p.teams.length} team{p.teams.length!==1?'s':''}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={s.card()}>
+                <label style={s.label}>Commissioner PIN</label>
+                <input style={s.input} type="password" placeholder="Enter PIN" value={pin}
+                  onChange={e => { setPin(e.target.value); setErr(''); }}
+                  onKeyDown={e => e.key==='Enter' && onCommissionerLogin(pin, setErr)} />
+                {err && <div style={{ color:C.red, fontSize:13, marginTop:8 }}>{err}</div>}
+                <button style={{ ...s.btn('gold'), marginTop:14, width:'100%' }}
+                  onClick={() => onCommissionerLogin(pin, setErr)}>
+                  Login as Commissioner →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function LobbyScreen({ state, isCommissioner, viewerName, onStartAuction, onShuffle }) {
+      return (
+        <div style={s.page}>
+          <Header subtitle="WAITING TO START"
+            right={<div style={{ fontFamily:F.cond, fontSize:13, color:C.gold }}>{isCommissioner ? '🎛 COMMISSIONER' : viewerName.toUpperCase()}</div>} />
+          <div style={{ maxWidth:480, margin:'0 auto', padding:'24px 16px' }}>
+            <div style={{ textAlign:'center', marginBottom:28 }}>
+              <div style={s.heading(42)}>READY TO</div>
+              <div style={{ ...s.heading(42), color:C.gold }}>DRAFT</div>
+              <div style={{ fontFamily:F.cond, color:C.dim, fontSize:14, marginTop:6 }}>48 teams available · 39 will be claimed · $100 per player</div>
+            </div>
+
+            <div style={{ marginBottom:24 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                <div style={{ fontFamily:F.cond, fontSize:12, letterSpacing:'0.12em', color:C.dim }}>DRAFT ORDER ({state.players.length} PLAYERS)</div>
+                {isCommissioner && <button onClick={onShuffle} style={s.btn('ghost',{fontSize:12,padding:'5px 12px'})}>🔀 Randomize</button>}
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                {state.players.map((p,i) => (
+                  <div key={p.name} style={{ ...s.card({padding:'10px 12px'}), border:`1px solid ${p.name===viewerName?C.gold:'transparent'}` }}>
+                    <div style={{ fontFamily:F.cond, fontWeight:700, fontSize:14, color:p.name===viewerName?C.gold:C.white }}>{p.name}</div>
+                    <div style={{ fontFamily:F.body, fontSize:12, color:C.dim, marginTop:2 }}>Round 1 #{i+1}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={s.card({marginBottom:24})}>
+              <div style={{ fontFamily:F.cond, fontSize:12, letterSpacing:'0.12em', color:C.gold, marginBottom:10 }}>SNAKE NOMINATION ORDER</div>
+              {[0,1,2].map(round => (
+                <div key={round} style={{ marginBottom:8 }}>
+                  <div style={{ fontFamily:F.cond, fontSize:11, color:C.dim, marginBottom:4 }}>ROUND {round+1}</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                    {NOM_ORDER.slice(round*13,(round+1)*13).map((pi,pos) => {
+                      const pname = state.players[pi]?.name || '';
+                      return (
+                        <div key={pos} style={{ background:C.deep, borderRadius:3, padding:'3px 7px',
+                          fontFamily:F.cond, fontSize:11,
+                          color: pname===viewerName ? C.gold : pname==='Trevor' ? 'rgba(245,197,24,0.6)' : C.white,
+                          fontWeight: (pname===viewerName||pname==='Trevor') ? 700 : 400 }}>
+                          {pname}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {isCommissioner ? (
+              <>
+                <button style={{ ...s.btn('gold'), width:'100%', fontSize:18, padding:16 }} onClick={onStartAuction}>🚀 Start Auction</button>
+                <div style={{ marginTop:14, fontFamily:F.body, fontSize:12, color:C.dim, textAlign:'center', lineHeight:1.5 }}>
+                  Share this page URL with participants — they select their name to join.
+                </div>
+              </>
+            ) : (
+              <div style={{ ...s.card({padding:14,textAlign:'center'}), border:`1px solid ${C.faint}` }}>
+                <div style={{ fontFamily:F.cond, color:C.dim, fontSize:14 }}>Waiting for commissioner to start the auction…</div>
+                <div style={{ fontFamily:F.body, color:C.dim, fontSize:12, marginTop:6 }}>This page auto-refreshes every 3 seconds</div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function ActiveLot({ lot, players, soldTeams, nomIndex, isCommissioner, onSell, onClear }) {
+      const [selectedPlayer, setSelectedPlayer] = useState('');
+      const [bidAmount, setBidAmount] = useState('');
+      const [err, setErr] = useState('');
+      const currentNominator = players[NOM_ORDER[nomIndex]]?.name || '';
+
+      if (!lot) {
+        return (
+          <div style={{ ...s.card({padding:20,textAlign:'center'}), border:`1px dashed ${C.faint}` }}>
+            <div style={{ fontFamily:F.cond, color:C.dim, fontSize:14 }}>No team up for bid</div>
+            <div style={{ fontFamily:F.cond, color:C.gold, fontSize:12, marginTop:6 }}>Waiting for {currentNominator} to nominate…</div>
+          </div>
+        );
+      }
+
+      const team = TEAMS.find(t => t.name===lot.name);
+      const handleSell = () => {
+        const price = parseInt(bidAmount);
+        const pi = players.findIndex(p => p.name===selectedPlayer);
+        if (!selectedPlayer||pi===-1) { setErr('Select a player'); return; }
+        if (!price||price<1) { setErr('Minimum bid is $1'); return; }
+        const player = players[pi];
+        if (price>player.budget) { setErr(`${player.name} only has $${player.budget}`); return; }
+        if (player.teams.length>=TEAMS_PER_PLAYER) { setErr(`${player.name} already has ${TEAMS_PER_PLAYER} teams`); return; }
+        const remaining = TEAMS_PER_PLAYER - player.teams.length;
+        if (price > player.budget-(remaining-1)) { setErr(`Max bid for ${player.name}: $${maxBid(player)}`); return; }
+        onSell(lot.name, pi, price);
+        setSelectedPlayer(''); setBidAmount(''); setErr('');
+      };
+
+      return (
+        <div style={{ ...s.card({padding:0}), border:`2px solid ${C.gold}`, overflow:'hidden' }}>
+          <div style={{ background:C.gold, padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ fontFamily:F.cond, fontSize:12, fontWeight:700, letterSpacing:'0.1em', color:C.navy }}>
+              NOW BIDDING · LOT {teamsSold(soldTeams)+1}/{TOTAL_LOTS}
+            </div>
+            {isCommissioner && <button onClick={onClear} style={{ background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:18,lineHeight:1,padding:0 }}>✕</button>}
+          </div>
+          <div style={{ padding:'20px 16px', textAlign:'center', borderBottom:`1px solid ${C.faint}` }}>
+            <div style={{ fontSize:52, lineHeight:1, marginBottom:8 }}>{team?.flag}</div>
+            <div style={{ fontFamily:F.display, fontSize:38, color:C.white }}>{lot.name}</div>
+            <div style={{ fontFamily:F.cond, fontSize:13, color:C.dim, marginTop:4 }}>FIFA Rank #{lot.rank}</div>
+          </div>
+          {isCommissioner && (
+            <div style={{ padding:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div>
+                  <label style={s.label}>Winner</label>
+                  <select value={selectedPlayer} onChange={e => { setSelectedPlayer(e.target.value); setErr(''); }}
+                    style={{ ...s.input, cursor:'pointer' }}>
+                    <option value="">Select player…</option>
+                    {players.filter(p=>p.teams.length<TEAMS_PER_PLAYER).map(p => (
+                      <option key={p.name} value={p.name}>{p.name} (${p.budget}, max ${maxBid(p)})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={s.label}>Winning Bid ($)</label>
+                  <input style={s.input} type="number" min="1" placeholder="$" value={bidAmount}
+                    onChange={e => { setBidAmount(e.target.value); setErr(''); }}
+                    onKeyDown={e => e.key==='Enter' && handleSell()} />
+                </div>
+              </div>
+              {err && <div style={{ color:C.red, fontSize:12, marginBottom:8 }}>{err}</div>}
+              <button style={{ ...s.btn('gold'), width:'100%' }} onClick={handleSell}>✓ Confirm Sale</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function PlayerCards({ players, currentNominator, viewerName, soldTeams }) {
+      return (
+        <div>
+          <div style={{ fontFamily:F.cond, fontSize:12, letterSpacing:'0.12em', color:C.dim, marginBottom:8 }}>
+            PLAYERS · {teamsSold(soldTeams)}/{TOTAL_LOTS} TEAMS SOLD
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {players.map(p => {
+              const isNom = p.name===currentNominator;
+              const isSelf = p.name===viewerName;
+              const remaining = TEAMS_PER_PLAYER - p.teams.length;
+              const done = remaining===0;
+              return (
+                <div key={p.name} style={{ ...s.card({padding:'10px 12px'}),
+                  border:`1px solid ${isNom?C.gold:isSelf?'rgba(245,197,24,0.35)':'transparent'}`,
+                  opacity: done?0.6:1 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div style={{ fontFamily:F.cond, fontWeight:700, fontSize:14, color:isSelf?C.gold:C.white }}>
+                      {isNom && <span style={{ color:C.gold, marginRight:4 }}>🎤</span>}{p.name}
+                    </div>
+                    <div style={{ fontFamily:F.display, fontSize:20, color:done?C.dim:p.budget<=5?C.red:C.gold }}>${p.budget}</div>
+                  </div>
+                  {p.teams.length>0 ? (
+                    <div style={{ marginTop:6 }}>
+                      {p.teams.map(t => {
+                        const td = TEAMS.find(x=>x.name===t.name);
+                        return <div key={t.name} style={{ fontFamily:F.cond, fontSize:12, color:C.dim, marginTop:2 }}>{td?.flag} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
+                      })}
+                      {!done && <div style={{ fontFamily:F.body, fontSize:11, color:C.dim, marginTop:4 }}>{remaining} slot{remaining>1?'s':''} left · max ${maxBid(p)}</div>}
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily:F.body, fontSize:11, color:C.dim, marginTop:4 }}>No teams yet · max ${maxBid(p)}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function TeamList({ players, soldTeams, currentLot, onNominate }) {
+      const [search, setSearch] = useState('');
+      const available = TEAMS.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) && !soldTeams[t.name]);
+      const sold = TEAMS.filter(t => soldTeams[t.name]);
+      return (
+        <div>
+          <div style={{ fontFamily:F.cond, fontSize:12, letterSpacing:'0.12em', color:C.dim, marginBottom:8 }}>
+            AVAILABLE TEAMS ({TEAMS.length - Object.keys(soldTeams).length})
+          </div>
+          <input style={{ ...s.input, marginBottom:10, fontSize:13 }} placeholder="Search teams…"
+            value={search} onChange={e => setSearch(e.target.value)} />
+          <div style={{ maxHeight:340, overflowY:'auto', borderRadius:6 }}>
+            {available.map(t => {
+              const isActive = currentLot?.name===t.name;
+              const isUSA = t.name==='USA';
+              return (
+                <div key={t.name} onClick={() => !currentLot && onNominate(t)}
+                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'9px 12px',
+                    background: isActive?C.goldDim:isUSA?'rgba(0,40,104,0.4)':'transparent',
+                    borderBottom:`1px solid ${C.faint}`,
+                    cursor: currentLot?'default':'pointer',
+                    borderLeft: isUSA?`3px solid rgba(178,34,52,0.6)`:`3px solid transparent` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:20 }}>{t.flag}</span>
+                    <div>
+                      <div style={{ fontFamily:F.cond, fontWeight:700, fontSize:14, color:isActive?C.gold:C.white }}>{t.name}</div>
+                      <div style={{ fontFamily:F.body, fontSize:11, color:C.dim }}>FIFA #{t.rank}</div>
+                    </div>
+                  </div>
+                  {isActive
+                    ? <div style={{ fontFamily:F.cond, fontSize:11, color:C.gold, fontWeight:700 }}>ON THE BLOCK</div>
+                    : !currentLot && <div style={{ fontFamily:F.cond, fontSize:11, color:C.dim }}>TAP TO NOMINATE</div>
+                  }
+                </div>
+              );
+            })}
+          </div>
+          {sold.length>0 && (
+            <div style={{ marginTop:16 }}>
+              <div style={{ fontFamily:F.cond, fontSize:11, letterSpacing:'0.1em', color:C.dim, marginBottom:6 }}>SOLD ({sold.length})</div>
+              {sold.map(t => {
+                const sale = soldTeams[t.name];
+                const winner = players[sale.playerIndex]?.name || '?';
+                return (
+                  <div key={t.name} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'6px 12px', borderBottom:`1px solid ${C.faint}`, opacity:0.5 }}>
+                    <div style={{ fontFamily:F.cond, fontSize:13, color:C.dim }}>{t.flag} {t.name}</div>
+                    <div style={{ fontFamily:F.cond, fontSize:12, color:C.dim }}>{winner} · ${sale.price}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function CommissionerAuction({ state, onNominate, onSell, onClear, onReset }) {
+      const [showReset, setShowReset] = useState(false);
+      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]]?.name || '';
+      const sold = teamsSold(state.soldTeams);
+      return (
+        <div style={s.page}>
+          <Header subtitle={`LOT ${sold+1}/${TOTAL_LOTS} · ${nomPlayer.toUpperCase()}'S TURN TO NOMINATE`}
+            right={<div style={{ background:C.grass, borderRadius:4, padding:'4px 10px',
+              fontFamily:F.cond, fontSize:12, fontWeight:700, letterSpacing:'0.06em' }}>🎛 COMMISSIONER</div>} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', height:'calc(100vh - 57px)' }}>
+            <div style={{ padding:16, overflowY:'auto', borderRight:`1px solid ${C.faint}` }}>
+              <TeamList players={state.players} soldTeams={state.soldTeams} currentLot={state.currentLot} onNominate={onNominate} />
+            </div>
+            <div style={{ padding:16, overflowY:'auto' }}>
+              <div style={{ marginBottom:20 }}>
+                <ActiveLot lot={state.currentLot} players={state.players} soldTeams={state.soldTeams}
+                  nomIndex={state.nomIndex} isCommissioner={true} onSell={onSell} onClear={onClear} />
+              </div>
+              <PlayerCards players={state.players} currentNominator={nomPlayer} viewerName="" soldTeams={state.soldTeams} />
+              <div style={{ marginTop:24, borderTop:`1px solid ${C.faint}`, paddingTop:16 }}>
+                {!showReset
+                  ? <button style={s.btn('ghost',{width:'100%',fontSize:12})} onClick={()=>setShowReset(true)}>Reset Auction</button>
+                  : <div style={{textAlign:'center'}}>
+                      <div style={{fontFamily:F.cond,color:C.red,fontSize:13,marginBottom:10}}>Erase all progress. Are you sure?</div>
+                      <div style={{display:'flex',gap:8}}>
+                        <button style={s.btn('red',{flex:1})} onClick={onReset}>Yes, Reset</button>
+                        <button style={s.btn('ghost',{flex:1})} onClick={()=>setShowReset(false)}>Cancel</button>
+                      </div>
+                    </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ParticipantAuction({ state, viewerName, onRefresh }) {
+      const [refreshing, setRefreshing] = useState(false);
+      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]]?.name || '';
+      const sold = teamsSold(state.soldTeams);
+      const myPlayer = state.players.find(p => p.name===viewerName);
+      const handleRefresh = async () => { setRefreshing(true); await onRefresh(); setTimeout(()=>setRefreshing(false),600); };
+      return (
+        <div style={s.page}>
+          <Header subtitle={`LOT ${sold+1}/${TOTAL_LOTS} · ${nomPlayer.toUpperCase()} NOMINATES`}
+            right={<button onClick={handleRefresh}
+              style={{background:'none',border:'none',cursor:'pointer',color:refreshing?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>} />
+          <div style={{ maxWidth:480, margin:'0 auto', padding:16 }}>
+            {myPlayer && (
+              <div style={{ ...s.card({padding:'12px 14px',marginBottom:16}), border:`1px solid ${C.gold}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <div style={{ fontFamily:F.display, fontSize:22, color:C.gold }}>{myPlayer.name}</div>
+                    <div style={{ fontFamily:F.cond, fontSize:12, color:C.dim, marginTop:2 }}>
+                      {myPlayer.teams.length}/{TEAMS_PER_PLAYER} teams · max bid ${maxBid(myPlayer)}
+                    </div>
+                  </div>
+                  <div style={{ fontFamily:F.display, fontSize:40, color:C.gold }}>${myPlayer.budget}</div>
+                </div>
+                {myPlayer.teams.length>0 && (
+                  <div style={{ marginTop:8, borderTop:`1px solid ${C.faint}`, paddingTop:8, display:'flex', gap:10, flexWrap:'wrap' }}>
+                    {myPlayer.teams.map(t => {
+                      const td = TEAMS.find(x=>x.name===t.name);
+                      return <div key={t.name} style={{fontFamily:F.cond,fontSize:13,color:C.white}}>{td?.flag} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ marginBottom:20 }}>
+              <ActiveLot lot={state.currentLot} players={state.players} soldTeams={state.soldTeams}
+                nomIndex={state.nomIndex} isCommissioner={false} />
+            </div>
+            <PlayerCards players={state.players} currentNominator={nomPlayer} viewerName={viewerName} soldTeams={state.soldTeams} />
+            <div style={{ textAlign:'center', fontFamily:F.body, fontSize:11, color:C.dim, marginTop:16 }}>
+              Auto-refreshes every 3s · tap ↻ to refresh now
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function CompleteScreen({ state }) {
+      return (
+        <div style={s.page}>
+          <Header subtitle="AUCTION COMPLETE" />
+          <div style={{ maxWidth:600, margin:'0 auto', padding:'24px 16px' }}>
+            <div style={{ textAlign:'center', marginBottom:28 }}>
+              <div style={s.heading(52)}>AUCTION</div>
+              <div style={{ ...s.heading(52), color:C.gold }}>COMPLETE</div>
+              <div style={{ fontFamily:F.cond, color:C.dim, fontSize:14, marginTop:6 }}>All 39 teams claimed · Tournament starts June 11</div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              {state.players.map(p => (
+                <div key={p.name} style={s.card({padding:14})}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+                    <div style={{ fontFamily:F.cond, fontWeight:700, fontSize:16 }}>{p.name}</div>
+                    <div style={{ fontFamily:F.cond, fontSize:14, color:C.dim }}>${BUDGET-p.budget} spent</div>
+                  </div>
+                  {p.teams.map(t => {
+                    const td = TEAMS.find(x=>x.name===t.name);
+                    return (
+                      <div key={t.name} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'5px 0', borderBottom:`1px solid ${C.faint}` }}>
+                        <div style={{ fontFamily:F.cond, fontSize:13, color:C.white }}>
+                          {td?.flag} {t.name} <span style={{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6}}>#{td?.rank}</span>
+                        </div>
+                        <div style={{ fontFamily:F.display, fontSize:18, color:C.gold }}>${t.price}</div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontFamily:F.body, fontSize:11, color:C.dim, marginTop:6 }}>${p.budget} remaining</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign:'center', marginTop:28 }}>
+              <div style={{ fontFamily:F.cond, fontSize:13, color:C.gold, marginBottom:6 }}>⚽ WORLD CUP 2026 · JUNE 11 – JULY 19</div>
+              <div style={{ fontFamily:F.cond, fontSize:12, color:C.dim }}>Tournament scoring and bonus picks coming in Phase 2</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── ROOT ─────────────────────────────────────────────────────────────────
+    function App() {
+      const [state, setState] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [isCommissioner, setIsCommissioner] = useState(false);
+      const [viewerName, setViewerName] = useState('');
+      const refreshInterval = useRef(null);
+
+      useEffect(() => {
+        loadState().then(s => { setState(s || INIT_STATE); setLoading(false); });
+      }, []);
+
+      useEffect(() => {
+        const active = !isCommissioner && (state?.phase==='auction' || state?.phase==='lobby');
+        if (active) {
+          refreshInterval.current = setInterval(async () => {
+            const s = await loadState();
+            if (s) setState(s);
+          }, 3000);
+        }
+        return () => clearInterval(refreshInterval.current);
+      }, [isCommissioner, state?.phase]);
+
+      const persist = async (newState) => { setState(newState); await saveState(newState); };
+      const handleRefresh = async () => { const s = await loadState(); if (s) setState(s); };
+
+      if (loading || !state) return <LoadingScreen />;
+
+      if (state.phase==='setup') {
+        return <SetupScreen onComplete={async (pin) => { const ns={...state,pin,phase:'lobby'}; await persist(ns); setIsCommissioner(true); }} />;
+      }
+
+      if (!isCommissioner && !viewerName) {
+        return <LandingScreen state={state}
+          onJoinAsPlayer={name => setViewerName(name)}
+          onCommissionerLogin={(pin, setErr) => { if (pin===state.pin) setIsCommissioner(true); else setErr('Wrong PIN'); }} />;
+      }
+
+      if (state.phase==='lobby') {
+        return <LobbyScreen state={state} isCommissioner={isCommissioner} viewerName={viewerName}
+          onStartAuction={() => persist({...state, phase:'auction'})}
+          onShuffle={() => persist({...state, players:shufflePlayers(state.players)})} />;
+      }
+
+      if (state.phase==='auction') {
+        if (isCommissioner) {
+          return <CommissionerAuction state={state}
+            onNominate={team => persist({...state, currentLot:team})}
+            onSell={(teamName, playerIndex, price) => {
+              const newPlayers = state.players.map((p,i) => i!==playerIndex ? p : {...p, budget:p.budget-price, teams:[...p.teams,{name:teamName,price}]});
+              const newSold = {...state.soldTeams, [teamName]:{playerIndex,price}};
+              const total = Object.keys(newSold).length;
+              persist({...state, players:newPlayers, soldTeams:newSold, currentLot:null, nomIndex:state.nomIndex+1, phase:total>=TOTAL_LOTS?'complete':'auction'});
+            }}
+            onClear={() => persist({...state, currentLot:null})}
+            onReset={() => persist(INIT_STATE)} />;
+        }
+        return <ParticipantAuction state={state} viewerName={viewerName} onRefresh={handleRefresh} />;
+      }
+
+      if (state.phase==='complete') return <CompleteScreen state={state} />;
+
+      return <LoadingScreen />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
