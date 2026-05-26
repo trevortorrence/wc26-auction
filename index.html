@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -8,7 +7,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" />
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.9/babel.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0A1628; }
@@ -161,7 +160,7 @@
       return remaining <= 0 ? 0 : player.budget - (remaining - 1);
     };
     const teamsSold = (soldTeams) => Object.keys(soldTeams).length;
-    const nomName = (players, idx) => players[NOM_ORDER[idx]]?.name || '';
+    const nomName = (players, idx) => players[NOM_ORDER[idx]] ? players[NOM_ORDER[idx]].name : '';
 
     // ─── STYLES ──────────────────────────────────────────────────────────────
     const s = {
@@ -337,7 +336,7 @@
                   <div style={{ fontFamily:F.cond, fontSize:11, color:C.dim, marginBottom:4 }}>ROUND {round+1}</div>
                   <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                     {NOM_ORDER.slice(round*13,(round+1)*13).map((pi,pos) => {
-                      const pname = state.players[pi]?.name || '';
+                      const pname = state.players[pi] ? state.players[pi].name : '';
                       return (
                         <div key={pos} style={{ background:C.deep, borderRadius:3, padding:'3px 7px',
                           fontFamily:F.cond, fontSize:11,
@@ -374,7 +373,7 @@
       const [selectedPlayer, setSelectedPlayer] = useState('');
       const [bidAmount, setBidAmount] = useState('');
       const [err, setErr] = useState('');
-      const currentNominator = players[NOM_ORDER[nomIndex]]?.name || '';
+      const currentNominator = players[NOM_ORDER[nomIndex]] ? players[NOM_ORDER[nomIndex]].name : '';
 
       if (!lot) {
         return (
@@ -409,7 +408,7 @@
             {isCommissioner && <button onClick={onClear} style={{ background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:18,lineHeight:1,padding:0 }}>✕</button>}
           </div>
           <div style={{ padding:'20px 16px', textAlign:'center', borderBottom:`1px solid ${C.faint}` }}>
-            <div style={{ fontSize:52, lineHeight:1, marginBottom:8 }}>{team?.flag}</div>
+            <div style={{ fontSize:52, lineHeight:1, marginBottom:8 }}>{team ? team.flag : ''}</div>
             <div style={{ fontFamily:F.display, fontSize:38, color:C.white }}>{lot.name}</div>
             <div style={{ fontFamily:F.cond, fontSize:13, color:C.dim, marginTop:4 }}>FIFA Rank #{lot.rank}</div>
           </div>
@@ -467,7 +466,7 @@
                     <div style={{ marginTop:6 }}>
                       {p.teams.map(t => {
                         const td = TEAMS.find(x=>x.name===t.name);
-                        return <div key={t.name} style={{ fontFamily:F.cond, fontSize:12, color:C.dim, marginTop:2 }}>{td?.flag} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
+                        return <div key={t.name} style={{ fontFamily:F.cond, fontSize:12, color:C.dim, marginTop:2 }}>{td ? td.flag : ''} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
                       })}
                       {!done && <div style={{ fontFamily:F.body, fontSize:11, color:C.dim, marginTop:4 }}>{remaining} slot{remaining>1?'s':''} left · max ${maxBid(p)}</div>}
                     </div>
@@ -495,7 +494,7 @@
             value={search} onChange={e => setSearch(e.target.value)} />
           <div style={{ maxHeight:340, overflowY:'auto', borderRadius:6 }}>
             {available.map(t => {
-              const isActive = currentLot?.name===t.name;
+              const isActive = currentLot && currentLot.name===t.name;
               const isUSA = t.name==='USA';
               return (
                 <div key={t.name} onClick={() => !currentLot && onNominate(t)}
@@ -525,7 +524,7 @@
               <div style={{ fontFamily:F.cond, fontSize:11, letterSpacing:'0.1em', color:C.dim, marginBottom:6 }}>SOLD ({sold.length})</div>
               {sold.map(t => {
                 const sale = soldTeams[t.name];
-                const winner = players[sale.playerIndex]?.name || '?';
+                const winner = players[sale.playerIndex] ? players[sale.playerIndex].name : '?';
                 return (
                   <div key={t.name} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
                     padding:'6px 12px', borderBottom:`1px solid ${C.faint}`, opacity:0.5 }}>
@@ -542,7 +541,7 @@
 
     function CommissionerAuction({ state, onNominate, onSell, onClear, onReset }) {
       const [showReset, setShowReset] = useState(false);
-      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]]?.name || '';
+      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]] ? state.players[NOM_ORDER[state.nomIndex]].name : '';
       const sold = teamsSold(state.soldTeams);
       return (
         <div style={s.page}>
@@ -579,7 +578,7 @@
 
     function ParticipantAuction({ state, viewerName, onRefresh }) {
       const [refreshing, setRefreshing] = useState(false);
-      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]]?.name || '';
+      const nomPlayer = state.players[NOM_ORDER[state.nomIndex]] ? state.players[NOM_ORDER[state.nomIndex]].name : '';
       const sold = teamsSold(state.soldTeams);
       const myPlayer = state.players.find(p => p.name===viewerName);
       const handleRefresh = async () => { setRefreshing(true); await onRefresh(); setTimeout(()=>setRefreshing(false),600); };
@@ -604,7 +603,7 @@
                   <div style={{ marginTop:8, borderTop:`1px solid ${C.faint}`, paddingTop:8, display:'flex', gap:10, flexWrap:'wrap' }}>
                     {myPlayer.teams.map(t => {
                       const td = TEAMS.find(x=>x.name===t.name);
-                      return <div key={t.name} style={{fontFamily:F.cond,fontSize:13,color:C.white}}>{td?.flag} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
+                      return <div key={t.name} style={{fontFamily:F.cond,fontSize:13,color:C.white}}>{td ? td.flag : ''} {t.name} <span style={{color:C.gold}}>— ${t.price}</span></div>;
                     })}
                   </div>
                 )}
@@ -646,7 +645,7 @@
                       <div key={t.name} style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
                         padding:'5px 0', borderBottom:`1px solid ${C.faint}` }}>
                         <div style={{ fontFamily:F.cond, fontSize:13, color:C.white }}>
-                          {td?.flag} {t.name} <span style={{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6}}>#{td?.rank}</span>
+                          {td ? td.flag : ''} {t.name} <span style={{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6}}>#{td ? td.rank : ''}</span>
                         </div>
                         <div style={{ fontFamily:F.display, fontSize:18, color:C.gold }}>${t.price}</div>
                       </div>
@@ -678,7 +677,7 @@
       }, []);
 
       useEffect(() => {
-        const active = !isCommissioner && (state?.phase==='auction' || state?.phase==='lobby');
+        const active = !isCommissioner && (state && state.phase==='auction' || state && state.phase==='lobby');
         if (active) {
           refreshInterval.current = setInterval(async () => {
             const s = await loadState();
@@ -686,7 +685,7 @@
           }, 3000);
         }
         return () => clearInterval(refreshInterval.current);
-      }, [isCommissioner, state?.phase]);
+      }, [isCommissioner, state && state.phase]);
 
       const persist = async (newState) => { setState(newState); await saveState(newState); };
       const handleRefresh = async () => { const s = await loadState(); if (s) setState(s); };
@@ -730,7 +729,15 @@
       return <LoadingScreen />;
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    try {
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    } catch(e) {
+      document.getElementById('root').innerHTML =
+        '<div style="color:#F5C518;font-family:sans-serif;text-align:center;padding:60px 20px">' +
+        '<div style="font-size:36px;margin-bottom:16px">⚽</div>' +
+        '<div style="font-size:18px;margin-bottom:12px">App failed to start</div>' +
+        '<div style="font-size:12px;opacity:0.6;max-width:400px;margin:0 auto">' + e.message + '</div></div>';
+    }
   </script>
 </body>
 </html>
