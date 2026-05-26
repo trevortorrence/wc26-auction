@@ -55,9 +55,26 @@ const shuffle=players=>{
 };
 
 const FB='https://wc26-auction-default-rtdb.firebaseio.com/wc26-auction-v1.json';
-const load=async()=>{try{const r=await fetch(FB);const d=await r.json();return d||null;}catch(e){console.error(e);return null;}};
-const save=async s=>{try{await fetch(FB,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});}catch(e){console.error(e);}};
-
+const load=async()=>{
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),6000);
+    const r=await fetch(FB,{signal:ctrl.signal});
+    clearTimeout(t);
+    if(!r.ok){console.error('Firebase HTTP error:',r.status);return null;}
+    const d=await r.json();
+    if(!d||!d.phase||!Array.isArray(d.players)){console.warn('Invalid state, using default');return null;}
+    return d;
+  }catch(e){console.error('Load failed:',e.message);return null;}
+};
+const save=async s=>{
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),6000);
+    await fetch(FB,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(s),signal:ctrl.signal});
+    clearTimeout(t);
+  }catch(e){console.error('Save failed:',e.message);}
+};
 const maxBid=p=>{const r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
 const nSold=st=>Object.keys(st).length;
 const nomN=(pl,idx)=>{const p=pl[NOM[idx]];return p?p.name:'';};
@@ -420,4 +437,3 @@ render(html`<${App}/>`,document.getElementById('root'));
 </script>
 </body>
 </html>
-
