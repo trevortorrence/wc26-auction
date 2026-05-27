@@ -95,8 +95,13 @@ function loadFB(){
     xhr.onload=function(){
       try{
         var d=JSON.parse(xhr.responseText);
-        if(d&&d.phase&&Array.isArray(d.players)){resolve(d);}
-        else{console.warn('Bad state',xhr.responseText.slice(0,80));resolve(null);}
+        if(d&&d.phase&&Array.isArray(d.players)){
+          // Firebase strips empty arrays/objects — restore defaults
+          d.players=d.players.map(function(p){return Object.assign({teams:[]},p);});
+          d.soldTeams=d.soldTeams||{};
+          d.currentLot=d.currentLot||null;
+          resolve(d);
+        }else{console.warn('Bad state shape');resolve(null);}
       }catch(e){console.error('Parse error',e);resolve(null);}
     };
     xhr.onerror=function(){console.error('XHR error');resolve(null);};
