@@ -105,10 +105,14 @@ function loadFB(){
   });
 }
 
-function saveFB(s){
+function saveFB(s,cb){
   var xhr=new XMLHttpRequest();
   xhr.open('PUT',FB,true);
-  xhr.setRequestHeader('Content-Type','application/json');
+  xhr.onload=function(){
+    if(xhr.status>=200&&xhr.status<300){if(cb)cb(null);}
+    else{console.error('Save failed:',xhr.status);if(cb)cb(new Error('HTTP '+xhr.status));}
+  };
+  xhr.onerror=function(){console.error('Save network error');if(cb)cb(new Error('network'));};
   xhr.send(JSON.stringify(s));
 }
 
@@ -433,7 +437,16 @@ function App(p){
   var ___=useState(''),viewer=___[0],setViewer=___[1];
   var tmr=useRef(null);
 
-  function persist(ns){setState(ns);saveFB(ns);}
+  var ____=useState(''),saveMsg=____[0],setSaveMsg=____[1];
+
+  function persist(ns){
+    setState(ns);
+    setSaveMsg('Saving...');
+    saveFB(ns,function(err){
+      setSaveMsg(err?'⚠ Save failed':'');
+      if(err)console.error('Persist error:',err);
+    });
+  }
 
   function refresh(){
     loadFB().then(function(s){if(s)setState(s);});
@@ -447,7 +460,10 @@ function App(p){
   },[isC,state.phase]);
 
   if(state.phase==='setup'){
-    return html`<${Setup} onDone=${function(pin){var ns=Object.assign({},state,{pin:pin,phase:'lobby'});persist(ns);setIsC(true);}}/>`;
+    return html`<div>
+      ${saveMsg?html`<div style=${{background:saveMsg.includes('⚠')?C.red:C.grass,color:C.white,fontFamily:F.cond,fontSize:12,textAlign:'center',padding:'4px'}}>${saveMsg}</div>`:''}
+      <${Setup} onDone=${function(pin){var ns=Object.assign({},state,{pin:pin,phase:'lobby'});persist(ns);setIsC(true);}}/>
+    </div>`;
   }
   if(!isC&&!viewer){
     return html`<${Landing} state=${state} onJoin=${function(n){setViewer(n);}} onComm=${function(pin,setErr){if(pin===state.pin)setIsC(true);else setErr('Wrong PIN');}}/>`;
