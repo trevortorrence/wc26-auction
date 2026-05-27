@@ -53,22 +53,30 @@ const C={navy:'#0A1628',mid:'#112240',deep:'#0D1E35',gold:'#F5C518',goldDim:'rgb
 const F={display:"'Bebas Neue',sans-serif",cond:"'Barlow Condensed',sans-serif",body:"'Barlow',sans-serif"};
 
 const TEAMS=[
-  {name:"France",rank:1,flag:"🇫🇷"},{name:"Spain",rank:2,flag:"🇪🇸"},{name:"Argentina",rank:3,flag:"🇦🇷"},
-  {name:"England",rank:4,flag:"🇬🇧"},{name:"Portugal",rank:5,flag:"🇵🇹"},{name:"Brazil",rank:6,flag:"🇧🇷"},
-  {name:"Netherlands",rank:7,flag:"🇳🇱"},{name:"Morocco",rank:8,flag:"🇲🇦"},{name:"Germany",rank:9,flag:"🇩🇪"},
-  {name:"Croatia",rank:10,flag:"🇭🇷"},{name:"Belgium",rank:11,flag:"🇧🇪"},{name:"Colombia",rank:13,flag:"🇨🇴"},
-  {name:"Senegal",rank:14,flag:"🇸🇳"},{name:"Mexico",rank:15,flag:"🇲🇽"},{name:"USA",rank:16,flag:"🇺🇸"},
-  {name:"Uruguay",rank:17,flag:"🇺🇾"},{name:"Japan",rank:18,flag:"🇯🇵"},{name:"Denmark",rank:19,flag:"🇩🇰"},
-  {name:"Serbia",rank:20,flag:"🇷🇸"},{name:"Iran",rank:21,flag:"🇮🇷"},{name:"Austria",rank:22,flag:"🇦🇹"},
-  {name:"Ecuador",rank:23,flag:"🇪🇨"},{name:"Switzerland",rank:24,flag:"🇨🇭"},{name:"South Korea",rank:25,flag:"🇰🇷"},
-  {name:"Norway",rank:26,flag:"🇳🇴"},{name:"Australia",rank:27,flag:"🇦🇺"},{name:"Sweden",rank:28,flag:"🇸🇪"},
-  {name:"Turkiye",rank:29,flag:"🇹🇷"},{name:"Canada",rank:30,flag:"🇨🇦"},{name:"Egypt",rank:33,flag:"🇪🇬"},
-  {name:"Algeria",rank:36,flag:"🇩🇿"},{name:"Paraguay",rank:38,flag:"🇵🇾"},{name:"Nigeria",rank:40,flag:"🇳🇬"},
-  {name:"South Africa",rank:41,flag:"🇿🇦"},{name:"Czechia",rank:42,flag:"🇨🇿"},{name:"Bosnia",rank:43,flag:"🇧🇦"},
-  {name:"Panama",rank:44,flag:"🇵🇦"},{name:"Tunisia",rank:45,flag:"🇹🇳"},{name:"Haiti",rank:47,flag:"🇭🇹"},
-  {name:"Curacao",rank:50,flag:"🇨🇼"},{name:"Qatar",rank:53,flag:"🇶🇦"},{name:"Iraq",rank:56,flag:"🇮🇶"},
-  {name:"Uzbekistan",rank:57,flag:"🇺🇿"},{name:"Saudi Arabia",rank:58,flag:"🇸🇦"},{name:"Jordan",rank:64,flag:"🇯🇴"},
-  {name:"Cape Verde",rank:65,flag:"🇨🇻"},{name:"Congo DR",rank:70,flag:"🇨🇩"},{name:"New Zealand",rank:88,flag:"🇳🇿"}
+  {name:"France",rank:1,code:"fr"},{name:"Spain",rank:2,code:"es"},
+  {name:"Argentina",rank:3,code:"ar"},{name:"England",rank:4,code:"gb-eng"},
+  {name:"Portugal",rank:5,code:"pt"},{name:"Brazil",rank:6,code:"br"},
+  {name:"Netherlands",rank:7,code:"nl"},{name:"Morocco",rank:8,code:"ma"},
+  {name:"Germany",rank:9,code:"de"},{name:"Croatia",rank:10,code:"hr"},
+  {name:"Belgium",rank:11,code:"be"},{name:"Colombia",rank:13,code:"co"},
+  {name:"Senegal",rank:14,code:"sn"},{name:"Mexico",rank:15,code:"mx"},
+  {name:"USA",rank:16,code:"us"},{name:"Uruguay",rank:17,code:"uy"},
+  {name:"Japan",rank:18,code:"jp"},{name:"Denmark",rank:19,code:"dk"},
+  {name:"Serbia",rank:20,code:"rs"},{name:"Iran",rank:21,code:"ir"},
+  {name:"Austria",rank:22,code:"at"},{name:"Ecuador",rank:23,code:"ec"},
+  {name:"Switzerland",rank:24,code:"ch"},{name:"South Korea",rank:25,code:"kr"},
+  {name:"Norway",rank:26,code:"no"},{name:"Australia",rank:27,code:"au"},
+  {name:"Sweden",rank:28,code:"se"},{name:"Turkiye",rank:29,code:"tr"},
+  {name:"Canada",rank:30,code:"ca"},{name:"Egypt",rank:33,code:"eg"},
+  {name:"Algeria",rank:36,code:"dz"},{name:"Paraguay",rank:38,code:"py"},
+  {name:"Nigeria",rank:40,code:"ng"},{name:"South Africa",rank:41,code:"za"},
+  {name:"Czechia",rank:42,code:"cz"},{name:"Bosnia",rank:43,code:"ba"},
+  {name:"Panama",rank:44,code:"pa"},{name:"Tunisia",rank:45,code:"tn"},
+  {name:"Haiti",rank:47,code:"ht"},{name:"Curacao",rank:50,code:"cw"},
+  {name:"Qatar",rank:53,code:"qa"},{name:"Iraq",rank:56,code:"iq"},
+  {name:"Uzbekistan",rank:57,code:"uz"},{name:"Saudi Arabia",rank:58,code:"sa"},
+  {name:"Jordan",rank:64,code:"jo"},{name:"Cape Verde",rank:65,code:"cv"},
+  {name:"Congo DR",rank:70,code:"cd"},{name:"New Zealand",rank:88,code:"nz"}
 ];
 
 const PNAMES=["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
@@ -125,6 +133,7 @@ function saveFB(s,cb){
 var maxBid=function(p){var r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
 var nSold=function(st){return Object.keys(st).length;};
 var nomN=function(pl,idx){var p=pl[NOM[idx]];return p?p.name:'';};
+var flagImg=function(code,size){return html`<img src=${'https://flagcdn.com/w'+size+'/'+code+'.png'} style=${{width:size+'px',height:'auto',borderRadius:2,verticalAlign:'middle',display:'inline-block'}} alt=${code}/>`;};
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 var S={
@@ -279,7 +288,7 @@ function Lot(p){
       ${p.isC&&html`<button onClick=${p.onClear} style=${{background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:18,padding:0}}>✕</button>`}
     </div>
     <div style=${{padding:'20px 16px',textAlign:'center',borderBottom:'1px solid '+C.faint}}>
-      <div style=${{fontSize:52,lineHeight:1,marginBottom:8}}>${team?team.flag:''}</div>
+      <div style=${{fontSize:52,lineHeight:1,marginBottom:8}}>${team?flagImg(team.code,64):null}</div>
       <div style=${{fontFamily:F.display,fontSize:38,color:C.white}}>${p.lot.name}</div>
       <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginTop:4}}>FIFA Rank #${p.lot.rank}</div>
     </div>
@@ -315,7 +324,7 @@ function Cards(p){
             <div style=${{fontFamily:F.display,fontSize:20,color:done?C.dim:pl.budget<=5?C.red:C.gold}}>$${pl.budget}</div>
           </div>
           ${pl.teams.length>0?html`<div style=${{marginTop:6}}>
-            ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>— $${t.price}</span></div>`;}) }
+            ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?flagImg(td.code,20):null} ${t.name} <span style=${{color:C.gold}}>— $${t.price}</span></div>`;}) }
             ${!done?html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>${rem} slot${rem>1?'s':''} left · max $${maxBid(pl)}</div>`:null}
           </div>`:html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>No teams yet · max $${maxBid(pl)}</div>`}
         </div>`;
@@ -336,7 +345,7 @@ function TList(p){
         var act=p.currentLot&&p.currentLot.name===t.name,usa=t.name==='USA';
         return html`<div key=${t.name} onClick=${function(){if(!p.currentLot)p.onNom(t);}} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px',background:act?C.goldDim:usa?'rgba(0,40,104,0.4)':'transparent',borderBottom:'1px solid '+C.faint,cursor:p.currentLot?'default':'pointer',borderLeft:usa?'3px solid rgba(178,34,52,0.6)':'3px solid transparent'}}>
           <div style=${{display:'flex',alignItems:'center',gap:10}}>
-            <span style=${{fontSize:20}}>${t.flag}</span>
+            <span>${flagImg(t.code,28)}</span>
             <div>
               <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:act?C.gold:C.white}}>${t.name}</div>
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank}</div>
@@ -349,7 +358,7 @@ function TList(p){
     ${sold.length>0?html`<div style=${{marginTop:12}}>
       <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,marginBottom:4}}>SOLD (${sold.length})</div>
       ${sold.map(function(t){var s=p.soldTeams[t.name];var w=p.players[s.playerIndex]?p.players[s.playerIndex].name:'?';return html`<div key=${t.name} style=${{display:'flex',justifyContent:'space-between',padding:'5px 10px',opacity:0.5,borderBottom:'1px solid '+C.faint}}>
-        <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${t.flag} ${t.name}</span>
+        <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${flagImg(t.code,20)} ${t.name}</span>
         <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${w} · $${s.price}</span>
       </div>`;}) }
     </div>`:null}
@@ -401,7 +410,7 @@ function PartView(p){
           <div style=${{fontFamily:F.display,fontSize:40,color:C.gold}}>$${me.budget}</div>
         </div>
         ${me.teams.length>0?html`<div style=${{marginTop:8,borderTop:'1px solid '+C.faint,paddingTop:8,display:'flex',gap:10,flexWrap:'wrap'}}>
-          ${me.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:13}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>$${t.price}</span></div>`;}) }
+          ${me.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:13}}>${td?flagImg(td.code,24):null} ${t.name} <span style=${{color:C.gold}}>$${t.price}</span></div>`;}) }
         </div>`:null}
       </div>`:null}
       <div style=${{marginBottom:20}}><${Lot} lot=${p.state.currentLot} players=${p.state.players} soldTeams=${p.state.soldTeams} nomIdx=${p.state.nomIndex} isC=${false}/></div>
@@ -426,7 +435,7 @@ function Done(p){
             <div style=${{fontFamily:F.cond,fontSize:14,color:C.dim}}>$${BUDGET-pl.budget} spent</div>
           </div>
           ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid '+C.faint}}>
-            <div style=${{fontFamily:F.cond,fontSize:13}}>${td?td.flag:''} ${t.name}</div>
+            <div style=${{fontFamily:F.cond,fontSize:13}}>${td?flagImg(td.code,24):null} ${t.name}</div>
             <div style=${{fontFamily:F.display,fontSize:18,color:C.gold}}>$${t.price}</div>
           </div>`;}) }
         </div>`;}) }
