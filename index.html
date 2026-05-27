@@ -393,7 +393,7 @@ function PartTeamList(p){
         ${flagImg(t.code,24)}
         <div style=${{flex:1}}>
           <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:t.name==='USA'?C.gold:C.white}}>${t.name}</div>
-          <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank}</div>
+          <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank} · Group ${t.group}</div>
         </div>
       </div>`;}) }
       ${sold.length>0 && html`<div style=${{padding:'8px 16px'}}>
