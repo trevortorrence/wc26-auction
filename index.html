@@ -54,30 +54,30 @@ const C={navy:'#0A1628',mid:'#112240',deep:'#0D1E35',gold:'#F5C518',goldDim:'rgb
 const F={display:"'Bebas Neue',sans-serif",cond:"'Barlow Condensed',sans-serif",body:"'Barlow',sans-serif"};
 
 const TEAMS=[
-  {name:"France",rank:1,code:"fr"},{name:"Spain",rank:2,code:"es"},
-  {name:"Argentina",rank:3,code:"ar"},{name:"England",rank:4,code:"gb-eng"},
-  {name:"Portugal",rank:5,code:"pt"},{name:"Brazil",rank:6,code:"br"},
-  {name:"Netherlands",rank:7,code:"nl"},{name:"Morocco",rank:8,code:"ma"},
-  {name:"Germany",rank:9,code:"de"},{name:"Croatia",rank:10,code:"hr"},
-  {name:"Belgium",rank:11,code:"be"},{name:"Colombia",rank:13,code:"co"},
-  {name:"Senegal",rank:14,code:"sn"},{name:"Mexico",rank:15,code:"mx"},
-  {name:"USA",rank:16,code:"us"},{name:"Uruguay",rank:17,code:"uy"},
-  {name:"Japan",rank:18,code:"jp"},{name:"Denmark",rank:19,code:"dk"},
-  {name:"Serbia",rank:20,code:"rs"},{name:"Iran",rank:21,code:"ir"},
-  {name:"Austria",rank:22,code:"at"},{name:"Ecuador",rank:23,code:"ec"},
-  {name:"Switzerland",rank:24,code:"ch"},{name:"South Korea",rank:25,code:"kr"},
-  {name:"Norway",rank:26,code:"no"},{name:"Australia",rank:27,code:"au"},
-  {name:"Sweden",rank:28,code:"se"},{name:"Turkiye",rank:29,code:"tr"},
-  {name:"Canada",rank:30,code:"ca"},{name:"Egypt",rank:33,code:"eg"},
-  {name:"Algeria",rank:36,code:"dz"},{name:"Paraguay",rank:38,code:"py"},
-  {name:"Nigeria",rank:40,code:"ng"},{name:"South Africa",rank:41,code:"za"},
-  {name:"Czechia",rank:42,code:"cz"},{name:"Bosnia",rank:43,code:"ba"},
-  {name:"Panama",rank:44,code:"pa"},{name:"Tunisia",rank:45,code:"tn"},
-  {name:"Haiti",rank:47,code:"ht"},{name:"Curacao",rank:50,code:"cw"},
-  {name:"Qatar",rank:53,code:"qa"},{name:"Iraq",rank:56,code:"iq"},
-  {name:"Uzbekistan",rank:57,code:"uz"},{name:"Saudi Arabia",rank:58,code:"sa"},
-  {name:"Jordan",rank:64,code:"jo"},{name:"Cape Verde",rank:65,code:"cv"},
-  {name:"Congo DR",rank:70,code:"cd"},{name:"New Zealand",rank:88,code:"nz"}
+  {name:"France",rank:1,code:"fr",group:"I"},{name:"Spain",rank:2,code:"es",group:"H"},
+  {name:"Argentina",rank:3,code:"ar",group:"J"},{name:"England",rank:4,code:"gb-eng",group:"L"},
+  {name:"Portugal",rank:5,code:"pt",group:"K"},{name:"Brazil",rank:6,code:"br",group:"C"},
+  {name:"Netherlands",rank:7,code:"nl",group:"F"},{name:"Morocco",rank:8,code:"ma",group:"C"},
+  {name:"Belgium",rank:9,code:"be",group:"G"},{name:"Germany",rank:10,code:"de",group:"E"},
+  {name:"Croatia",rank:11,code:"hr",group:"L"},{name:"Colombia",rank:13,code:"co",group:"K"},
+  {name:"Senegal",rank:14,code:"sn",group:"I"},{name:"Mexico",rank:15,code:"mx",group:"A"},
+  {name:"USA",rank:16,code:"us",group:"D"},{name:"Uruguay",rank:17,code:"uy",group:"H"},
+  {name:"Japan",rank:18,code:"jp",group:"F"},{name:"Switzerland",rank:19,code:"ch",group:"B"},
+  {name:"Iran",rank:21,code:"ir",group:"G"},{name:"Türkiye",rank:22,code:"tr",group:"D"},
+  {name:"Ecuador",rank:23,code:"ec",group:"E"},{name:"Austria",rank:24,code:"at",group:"J"},
+  {name:"South Korea",rank:25,code:"kr",group:"A"},{name:"Australia",rank:27,code:"au",group:"D"},
+  {name:"Algeria",rank:28,code:"dz",group:"J"},{name:"Egypt",rank:29,code:"eg",group:"G"},
+  {name:"Canada",rank:30,code:"ca",group:"B"},{name:"Norway",rank:31,code:"no",group:"I"},
+  {name:"Panama",rank:33,code:"pa",group:"L"},{name:"Côte d'Ivoire",rank:34,code:"ci",group:"E"},
+  {name:"Sweden",rank:38,code:"se",group:"F"},{name:"Paraguay",rank:40,code:"py",group:"D"},
+  {name:"Czechia",rank:41,code:"cz",group:"A"},{name:"Scotland",rank:43,code:"gb-sct",group:"C"},
+  {name:"Tunisia",rank:44,code:"tn",group:"F"},{name:"Congo DR",rank:46,code:"cd",group:"K"},
+  {name:"Uzbekistan",rank:50,code:"uz",group:"K"},{name:"Qatar",rank:55,code:"qa",group:"B"},
+  {name:"Iraq",rank:57,code:"iq",group:"I"},{name:"South Africa",rank:60,code:"za",group:"A"},
+  {name:"Saudi Arabia",rank:61,code:"sa",group:"H"},{name:"Jordan",rank:63,code:"jo",group:"J"},
+  {name:"Bosnia & Herz.",rank:65,code:"ba",group:"B"},{name:"Cabo Verde",rank:69,code:"cv",group:"H"},
+  {name:"Ghana",rank:74,code:"gh",group:"L"},{name:"Curaçao",rank:82,code:"cw",group:"E"},
+  {name:"Haiti",rank:83,code:"ht",group:"C"},{name:"New Zealand",rank:85,code:"nz",group:"G"}
 ];
 
 const PNAMES=["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
@@ -295,7 +295,7 @@ function Lot(p){
     <div style=${{padding:'20px 16px',textAlign:'center',borderBottom:'1px solid '+C.faint}}>
       <div style=${{fontSize:52,lineHeight:1,marginBottom:8}}>${team?flagImg(team.code,64):null}</div>
       <div style=${{fontFamily:F.display,fontSize:38,color:C.white}}>${p.lot.name}</div>
-      <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginTop:4}}>FIFA Rank #${p.lot.rank}</div>
+      <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginTop:4}}>FIFA Rank #${p.lot.rank} · Group ${p.lot.group}</div>
     </div>
     ${p.isC&&html`<div style=${{padding:16}}>
       <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
@@ -329,7 +329,7 @@ function Cards(p){
             <div style=${{fontFamily:F.display,fontSize:20,color:done?C.dim:pl.budget<=5?C.red:C.gold}}>$${pl.budget}</div>
           </div>
           ${pl.teams.length>0?html`<div style=${{marginTop:6}}>
-            ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?flagImg(td.code,20):null} ${t.name} <span style=${{color:C.gold}}>— $${t.price}</span></div>`;}) }
+            ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?flagImg(td.code,20):null} ${t.name} <span style=${{color:C.gold}}>$${t.price}</span> <span style=${{color:C.dim,fontSize:10}}>Grp ${td?td.group:''}</span></div>`;}) }
             ${!done?html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>${rem} slot${rem>1?'s':''} left · max $${maxBid(pl)}</div>`:null}
           </div>`:html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>No teams yet · max $${maxBid(pl)}</div>`}
         </div>`;
@@ -345,7 +345,7 @@ function TList(p){
   return html`<div>
     <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim,marginBottom:8}}>AVAILABLE (${TEAMS.length-Object.keys(p.soldTeams).length})</div>
     <input style=${{...S.inp,marginBottom:10,fontSize:13}} placeholder="Search..." value=${q} onInput=${function(e){setQ(e.target.value);}}/>
-    <div style=${{maxHeight:340,overflowY:'auto'}}>
+    <div style=${{overflowY:'auto',flex:1}}>
       ${avail.map(function(t){
         var act=p.currentLot&&p.currentLot.name===t.name,usa=t.name==='USA';
         return html`<div key=${t.name} onClick=${function(){if(!p.currentLot)p.onNom(t);}} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px',background:act?C.goldDim:usa?'rgba(0,40,104,0.4)':'transparent',borderBottom:'1px solid '+C.faint,cursor:p.currentLot?'default':'pointer',borderLeft:usa?'3px solid rgba(178,34,52,0.6)':'3px solid transparent'}}>
@@ -353,7 +353,7 @@ function TList(p){
             <span>${flagImg(t.code,28)}</span>
             <div>
               <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:act?C.gold:C.white}}>${t.name}</div>
-              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank}</div>
+              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank} · Group ${t.group}</div>
             </div>
           </div>
           ${act?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.gold,fontWeight:700}}>ON THE BLOCK</div>`:!p.currentLot?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>TAP</div>`:null}
@@ -367,6 +367,42 @@ function TList(p){
         <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${w} · $${s.price}</span>
       </div>`;}) }
     </div>`:null}
+  </div>`;
+}
+
+function PartTeamList(p){
+  var _=useState(false),open=_[0],setOpen=_[1];
+  var avail=TEAMS.filter(function(t){return !p.soldTeams[t.name];});
+  var sold=TEAMS.filter(function(t){return !!p.soldTeams[t.name];});
+  return html`<div style=${{marginTop:16}}>
+    <button onClick=${function(){setOpen(!open);}} style=${{width:'100%',background:C.mid,border:'1px solid '+C.faint,borderRadius:8,padding:'12px 16px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:C.white}}>
+        AVAILABLE TEAMS
+        <span style=${{fontFamily:F.body,fontSize:12,color:C.dim,marginLeft:8}}>${avail.length} remaining</span>
+      </div>
+      <span style=${{color:C.gold,fontSize:16}}>${open?'▲':'▼'}</span>
+    </button>
+    ${open && html`<div style=${{background:C.mid,borderRadius:'0 0 8px 8px',borderTop:'1px solid '+C.faint}}>
+      ${avail.map(function(t){return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',gap:10,padding:'8px 16px',borderBottom:'1px solid '+C.faint}}>
+        ${flagImg(t.code,24)}
+        <div style=${{flex:1}}>
+          <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:t.name==='USA'?C.gold:C.white}}>${t.name}</div>
+          <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank}</div>
+        </div>
+      </div>`;}) }
+      ${sold.length>0 && html`<div style=${{padding:'8px 16px'}}>
+        <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,marginBottom:6,letterSpacing:'0.1em'}}>SOLD (${sold.length})</div>
+        <div style=${{display:'flex',flexWrap:'wrap',gap:6}}>
+          ${sold.map(function(t){
+            var s=p.soldTeams[t.name];
+            return html`<div key=${t.name} style=${{background:C.deep,borderRadius:4,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,opacity:0.6}}>
+              ${flagImg(t.code,16)}
+              <span style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>${t.name} · $${s.price}</span>
+            </div>`;
+          }) }
+        </div>
+      </div>`}
+    </div>`}
   </div>`;
 }
 
@@ -420,6 +456,10 @@ function PartView(p){
       </div>`:null}
       <div style=${{marginBottom:20}}><${Lot} lot=${p.state.currentLot} players=${p.state.players} soldTeams=${p.state.soldTeams} nomIdx=${p.state.nomIndex} isC=${false}/></div>
       <${Cards} players=${p.state.players} nom=${nom} viewer=${p.viewer} soldTeams=${p.state.soldTeams}/>
+
+      <!-- Available teams for participants -->
+      <${PartTeamList} soldTeams=${p.state.soldTeams}/>
+
       <div style=${{textAlign:'center',fontFamily:F.body,fontSize:11,color:C.dim,marginTop:16}}>Auto-refreshes every 3s · tap ↻ now</div>
     </div>
   </div>`;
