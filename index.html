@@ -9,16 +9,46 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{background:#0A1628;color:#FAFAF5}
     select option{background:#0D1E35;color:#FAFAF5}
-    ::-webkit-scrollbar{width:6px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:rgba(245,197,24,0.3);border-radius:3px}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:rgba(245,197,24,0.3);border-radius:3px}
   </style>
 </head>
 <body>
-<div id="root"><p style="color:#F5C518;font-family:sans-serif;text-align:center;padding:60px 20px;font-size:18px">Loading WC26 Auction...</p></div>
-<script type="module">
-import{html,render,useState,useEffect,useRef}from'https://cdn.jsdelivr.net/npm/htm@3/preact/standalone.module.js';
+<div id="status" style="color:#F5C518;font-family:sans-serif;text-align:center;padding:80px 20px">
+  <div style="font-size:52px;font-family:'Bebas Neue',sans-serif;letter-spacing:0.04em">WC26</div>
+  <div id="status-msg" style="font-size:14px;letter-spacing:0.15em;margin-top:12px;opacity:0.7">LOADING...</div>
+</div>
+<div id="root"></div>
 
+<!-- Load React and ReactDOM as globals first -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<script>
+// ── Verify React loaded ───────────────────────────────────────────────────────
+if(typeof React === 'undefined' || typeof ReactDOM === 'undefined'){
+  document.getElementById('status-msg').textContent = 'ERROR: React failed to load';
+}
+</script>
+
+<!-- Load htm UMD - binds to window.htm -->
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+
+<script>
+// ── Verify htm loaded ─────────────────────────────────────────────────────────
+if(typeof htm === 'undefined'){
+  document.getElementById('status-msg').textContent = 'ERROR: htm failed to load';
+}
+</script>
+
+<script>
+(function(){
+// ── Setup ─────────────────────────────────────────────────────────────────────
+const html = htm.bind(React.createElement);
+const{useState,useEffect,useRef,useCallback}=React;
+
+document.getElementById('status-msg').textContent='CONNECTING...';
+
+// ── Data ──────────────────────────────────────────────────────────────────────
 const C={navy:'#0A1628',mid:'#112240',deep:'#0D1E35',gold:'#F5C518',goldDim:'rgba(245,197,24,0.18)',red:'#D0021B',grass:'#1A6B3A',white:'#FAFAF5',dim:'rgba(250,250,245,0.55)',faint:'rgba(250,250,245,0.12)'};
 const F={display:"'Bebas Neue',sans-serif",cond:"'Barlow Condensed',sans-serif",body:"'Barlow',sans-serif"};
 
@@ -41,164 +71,170 @@ const TEAMS=[
   {name:"Cape Verde",rank:65,flag:"🇨🇻"},{name:"Congo DR",rank:70,flag:"🇨🇩"},{name:"New Zealand",rank:88,flag:"🇳🇿"}
 ];
 
-const PLAYERS=["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
-const BUDGET=100,TPP=3,TOTAL=PLAYERS.length*TPP;
+const PNAMES=["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
+const BUDGET=100,TPP=3,TOTAL=PNAMES.length*TPP;
 const NOM=[...Array.from({length:13},(_,i)=>i),...Array.from({length:13},(_,i)=>12-i),...Array.from({length:13},(_,i)=>i)];
-const INIT={phase:'setup',pin:'',players:PLAYERS.map(n=>({name:n,budget:BUDGET,teams:[]})),currentLot:null,nomIndex:0,soldTeams:{}};
+const INIT={phase:'setup',pin:'',players:PNAMES.map(n=>({name:n,budget:BUDGET,teams:[]})),currentLot:null,nomIndex:0,soldTeams:{}};
 
-const shuffle=players=>{
-  const a=[...players];
+const shuffle=pl=>{
+  const a=[...pl];
   for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
   const ti=a.findIndex(p=>p.name==='Trevor');
   if(ti<=3){const sw=4+Math.floor(Math.random()*9);[a[ti],a[sw]]=[a[sw],a[ti]];}
   return a;
 };
 
+// ── Firebase ──────────────────────────────────────────────────────────────────
 const FB='https://wc26-auction-default-rtdb.firebaseio.com/wc26-auction-v1.json';
-const load=async()=>{
-  try{
-    const timer=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),4000));
-    const req=fetch(FB);
-    const r=await Promise.race([req,timer]);
-    if(!r.ok){console.error('Firebase status:',r.status);return null;}
-    const d=await r.json();
-    if(!d||!d.phase||!Array.isArray(d.players)){console.warn('Bad state shape:',JSON.stringify(d).slice(0,100));return null;}
-    return d;
-  }catch(e){console.error('Load error:',e.message);return null;}
-};
-const save=async s=>{
-  try{
-    const timer=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000));
-    const req=fetch(FB,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
-    await Promise.race([req,timer]);
-  }catch(e){console.error('Save error:',e.message);}
-};
-const maxBid=p=>{const r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
-const nSold=st=>Object.keys(st).length;
-const nomN=(pl,idx)=>{const p=pl[NOM[idx]];return p?p.name:'';};
 
-const sty={
+function loadFB(){
+  return new Promise(function(resolve){
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET',FB,true);
+    xhr.timeout=5000;
+    xhr.onload=function(){
+      try{
+        var d=JSON.parse(xhr.responseText);
+        if(d&&d.phase&&Array.isArray(d.players)){resolve(d);}
+        else{console.warn('Bad state',xhr.responseText.slice(0,80));resolve(null);}
+      }catch(e){console.error('Parse error',e);resolve(null);}
+    };
+    xhr.onerror=function(){console.error('XHR error');resolve(null);};
+    xhr.ontimeout=function(){console.warn('XHR timeout');resolve(null);};
+    xhr.send();
+  });
+}
+
+function saveFB(s){
+  var xhr=new XMLHttpRequest();
+  xhr.open('PUT',FB,true);
+  xhr.setRequestHeader('Content-Type','application/json');
+  xhr.send(JSON.stringify(s));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+var maxBid=function(p){var r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
+var nSold=function(st){return Object.keys(st).length;};
+var nomN=function(pl,idx){var p=pl[NOM[idx]];return p?p.name:'';};
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+var S={
   page:{minHeight:'100vh',background:C.navy,color:C.white,fontFamily:F.body},
-  card:(x={})=>({background:C.mid,borderRadius:8,padding:16,...x}),
-  btn:(v,x={})=>{
-    const b={fontFamily:F.cond,fontWeight:700,fontSize:15,letterSpacing:'0.06em',textTransform:'uppercase',border:'none',borderRadius:4,padding:'10px 20px',cursor:'pointer'};
-    if(v==='gold')return{...b,background:C.gold,color:C.navy,...x};
-    if(v==='red')return{...b,background:C.red,color:C.white,...x};
-    return{...b,background:'transparent',color:C.dim,border:'1px solid '+C.faint,...x};
+  card:function(x){return Object.assign({background:C.mid,borderRadius:8,padding:16},x||{});},
+  btn:function(v,x){
+    var b={fontFamily:F.cond,fontWeight:700,fontSize:15,letterSpacing:'0.06em',textTransform:'uppercase',border:'none',borderRadius:4,padding:'10px 20px',cursor:'pointer'};
+    if(v==='gold')return Object.assign({},b,{background:C.gold,color:C.navy},x||{});
+    if(v==='red')return Object.assign({},b,{background:C.red,color:C.white},x||{});
+    return Object.assign({},b,{background:'transparent',color:C.dim,border:'1px solid '+C.faint},x||{});
   },
   inp:{background:C.deep,border:'1px solid '+C.faint,borderRadius:4,color:C.white,fontFamily:F.body,fontSize:15,padding:'10px 14px',width:'100%',boxSizing:'border-box',outline:'none'},
   lbl:{fontFamily:F.cond,fontSize:12,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase',color:C.dim,display:'block',marginBottom:6},
-  hd:(n=32)=>({fontFamily:F.display,fontSize:n,letterSpacing:'0.02em',color:C.white,lineHeight:1,margin:0})
+  hd:function(n){return{fontFamily:F.display,fontSize:n||32,letterSpacing:'0.02em',color:C.white,lineHeight:1,margin:0};}
 };
 
-function Hdr({sub,right}){
+// ── Components ────────────────────────────────────────────────────────────────
+
+function Hdr(p){
   return html`<div style=${{background:C.deep,borderBottom:'3px solid '+C.gold,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100}}>
     <div>
       <div style=${{fontFamily:F.display,fontSize:22,color:C.gold,lineHeight:1}}>⚽ WC26 AUCTION</div>
-      ${sub&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,letterSpacing:'0.08em',marginTop:2}}>${sub}</div>`}
+      ${p.sub&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,letterSpacing:'0.08em',marginTop:2}}>${p.sub}</div>`}
     </div>
-    ${right}
+    ${p.right||null}
   </div>`;
 }
 
-function Spin(){
-  return html`<div style=${{...sty.page,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16}}>
-    <div style=${{fontFamily:F.display,fontSize:48,color:C.gold}}>WC26</div>
-    <div style=${{fontFamily:F.cond,color:C.dim,letterSpacing:'0.15em',fontSize:13}}>LOADING...</div>
-  </div>`;
-}
-
-function Setup({onDone}){
-  const[pin,setPin]=useState('');
-  const[err,setErr]=useState('');
-  const go=()=>{if(pin.length<2){setErr('At least 2 characters');return;}onDone(pin);};
-  return html`<div style=${sty.page}>
+function Setup(p){
+  var _=useState(''),pin=_[0],setPin=_[1];
+  var __=useState(''),err=__[0],setErr=__[1];
+  function go(){if(pin.length<2){setErr('At least 2 characters');return;}p.onDone(pin);}
+  return html`<div style=${S.page}>
     <${Hdr} sub="COMMISSIONER SETUP"/>
     <div style=${{maxWidth:420,margin:'0 auto',padding:'40px 20px'}}>
       <div style=${{textAlign:'center',marginBottom:40}}>
-        <div style=${sty.hd(52)}>AUCTION</div>
-        <div style=${{...sty.hd(52),color:C.gold}}>DRAFT</div>
+        <div style=${S.hd(52)}>AUCTION</div>
+        <div style=${{...S.hd(52),color:C.gold}}>DRAFT</div>
         <div style=${{fontFamily:F.cond,color:C.dim,marginTop:8,fontSize:15}}>FIFA World Cup 2026 · June 5 at 7:00 PM CT</div>
       </div>
-      <div style=${sty.card({marginBottom:24})}>
+      <div style=${S.card({marginBottom:24})}>
         <div style=${{fontFamily:F.cond,fontSize:13,color:C.gold,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:12}}>Commissioner Setup</div>
-        <p style=${{color:C.dim,fontSize:14,margin:'0 0 20px',lineHeight:1.5}}>Create a PIN to manage the draft. Participants join by selecting their name — no PIN needed.</p>
-        <label style=${sty.lbl}>Create Commissioner PIN</label>
-        <input style=${sty.inp} type="password" placeholder="e.g. 2026" value=${pin} onInput=${e=>{setPin(e.target.value);setErr('');}} onKeyDown=${e=>e.key==='Enter'&&go()}/>
+        <p style=${{color:C.dim,fontSize:14,margin:'0 0 20px',lineHeight:1.5}}>Create a PIN to manage the draft. Participants join by selecting their name.</p>
+        <label style=${S.lbl}>Create Commissioner PIN</label>
+        <input style=${S.inp} type="password" placeholder="e.g. 2026" value=${pin} onInput=${function(e){setPin(e.target.value);setErr('');}} onKeyDown=${function(e){if(e.key==='Enter')go();}}/>
         ${err&&html`<div style=${{color:C.red,fontSize:13,marginTop:8}}>${err}</div>`}
-        <button style=${{...sty.btn('gold'),marginTop:16,width:'100%'}} onClick=${go}>Create Game →</button>
+        <button style=${{...S.btn('gold'),marginTop:16,width:'100%'}} onClick=${go}>Create Game →</button>
       </div>
       <div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,textAlign:'center',letterSpacing:'0.08em'}}>13 PLAYERS · $100 BUDGET · 39 TEAMS · SNAKE DRAFT ORDER</div>
     </div>
   </div>`;
 }
 
-function Landing({state,onJoin,onComm}){
-  const[tab,setTab]=useState('player');
-  const[pin,setPin]=useState('');
-  const[err,setErr]=useState('');
-  return html`<div style=${sty.page}>
+function Landing(p){
+  var _=useState('player'),tab=_[0],setTab=_[1];
+  var __=useState(''),pin=__[0],setPin=__[1];
+  var ___=useState(''),err=___[0],setErr=___[1];
+  return html`<div style=${S.page}>
     <${Hdr} sub="JOIN THE GAME"/>
     <div style=${{maxWidth:420,margin:'0 auto',padding:'32px 16px'}}>
       <div style=${{textAlign:'center',marginBottom:32}}>
-        <div style=${sty.hd(48)}>WC26 DRAFT</div>
+        <div style=${S.hd(48)}>WC26 DRAFT</div>
         <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14,marginTop:6}}>June 5 · 7:00 PM CT · 13 Players</div>
       </div>
       <div style=${{display:'flex',background:C.deep,borderRadius:6,padding:4,marginBottom:24}}>
-        ${['player','commissioner'].map(t=>html`<button key=${t} onClick=${()=>{setTab(t);setErr('');}} style=${{flex:1,border:'none',borderRadius:4,padding:10,background:tab===t?C.gold:'transparent',color:tab===t?C.navy:C.dim,fontFamily:F.cond,fontWeight:700,fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer'}}>${t==='player'?'👤 Join as Player':'🎛 Commissioner'}</button>`)}
+        ${['player','commissioner'].map(function(t){return html`<button key=${t} onClick=${function(){setTab(t);setErr('');}} style=${{flex:1,border:'none',borderRadius:4,padding:10,background:tab===t?C.gold:'transparent',color:tab===t?C.navy:C.dim,fontFamily:F.cond,fontWeight:700,fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer'}}>${t==='player'?'👤 Join as Player':'🎛 Commissioner'}</button>`;}) }
       </div>
-      ${tab==='player'?html`<div style=${sty.card()}>
-        <label style=${sty.lbl}>Select Your Name</label>
+      ${tab==='player'?html`<div style=${S.card()}>
+        <label style=${S.lbl}>Select Your Name</label>
         <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
-          ${state.players.map(p=>html`<button key=${p.name} onClick=${()=>onJoin(p.name)} style=${{background:C.deep,border:'1px solid '+C.faint,borderRadius:4,padding:'12px 8px',cursor:'pointer',fontFamily:F.cond,fontWeight:700,fontSize:15,color:C.white}}>
-            ${p.name}
-            <div style=${{fontFamily:F.body,fontWeight:400,fontSize:12,color:C.dim,marginTop:2}}>$${p.budget} · ${p.teams.length} teams</div>
-          </button>`)}
+          ${p.state.players.map(function(pl){return html`<button key=${pl.name} onClick=${function(){p.onJoin(pl.name);}} style=${{background:C.deep,border:'1px solid '+C.faint,borderRadius:4,padding:'12px 8px',cursor:'pointer',fontFamily:F.cond,fontWeight:700,fontSize:15,color:C.white}}>
+            ${pl.name}
+            <div style=${{fontFamily:F.body,fontWeight:400,fontSize:12,color:C.dim,marginTop:2}}>$${pl.budget} · ${pl.teams.length} teams</div>
+          </button>`;}) }
         </div>
-      </div>`:html`<div style=${sty.card()}>
-        <label style=${sty.lbl}>Commissioner PIN</label>
-        <input style=${sty.inp} type="password" placeholder="Enter PIN" value=${pin} onInput=${e=>{setPin(e.target.value);setErr('');}} onKeyDown=${e=>e.key==='Enter'&&onComm(pin,setErr)}/>
+      </div>`:html`<div style=${S.card()}>
+        <label style=${S.lbl}>Commissioner PIN</label>
+        <input style=${S.inp} type="password" placeholder="Enter PIN" value=${pin} onInput=${function(e){setPin(e.target.value);setErr('');}} onKeyDown=${function(e){if(e.key==='Enter')p.onComm(pin,setErr);}}/>
         ${err&&html`<div style=${{color:C.red,fontSize:13,marginTop:8}}>${err}</div>`}
-        <button style=${{...sty.btn('gold'),marginTop:14,width:'100%'}} onClick=${()=>onComm(pin,setErr)}>Login as Commissioner →</button>
+        <button style=${{...S.btn('gold'),marginTop:14,width:'100%'}} onClick=${function(){p.onComm(pin,setErr);}}>Login as Commissioner →</button>
       </div>`}
     </div>
   </div>`;
 }
 
-function Lobby({state,isC,viewer,onStart,onShuf}){
-  return html`<div style=${sty.page}>
-    <${Hdr} sub="WAITING TO START" right=${html`<div style=${{fontFamily:F.cond,fontSize:13,color:C.gold}}>${isC?'🎛 COMMISSIONER':viewer.toUpperCase()}</div>`}/>
+function Lobby(p){
+  return html`<div style=${S.page}>
+    <${Hdr} sub="WAITING TO START" right=${html`<div style=${{fontFamily:F.cond,fontSize:13,color:C.gold}}>${p.isC?'🎛 COMMISSIONER':p.viewer.toUpperCase()}</div>`}/>
     <div style=${{maxWidth:480,margin:'0 auto',padding:'24px 16px'}}>
       <div style=${{textAlign:'center',marginBottom:28}}>
-        <div style=${sty.hd(42)}>READY TO</div>
-        <div style=${{...sty.hd(42),color:C.gold}}>DRAFT</div>
+        <div style=${S.hd(42)}>READY TO</div>
+        <div style=${{...S.hd(42),color:C.gold}}>DRAFT</div>
         <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14,marginTop:6}}>48 teams · 39 claimed · $100 budget</div>
       </div>
       <div style=${{marginBottom:24}}>
         <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim}}>DRAFT ORDER (${state.players.length} PLAYERS)</div>
-          ${isC&&html`<button onClick=${onShuf} style=${sty.btn('ghost',{fontSize:12,padding:'5px 12px'})}>🔀 Randomize</button>`}
+          <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim}}>DRAFT ORDER</div>
+          ${p.isC&&html`<button onClick=${p.onShuf} style=${S.btn('ghost',{fontSize:12,padding:'5px 12px'})}>🔀 Randomize</button>`}
         </div>
         <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-          ${state.players.map((p,i)=>html`<div key=${p.name} style=${{...sty.card({padding:'10px 12px'}),border:'1px solid '+(p.name===viewer?C.gold:'transparent')}}>
-            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:p.name===viewer?C.gold:C.white}}>${p.name}</div>
+          ${p.state.players.map(function(pl,i){return html`<div key=${pl.name} style=${{...S.card({padding:'10px 12px'}),border:'1px solid '+(pl.name===p.viewer?C.gold:'transparent')}}>
+            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:pl.name===p.viewer?C.gold:C.white}}>${pl.name}</div>
             <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,marginTop:2}}>Round 1 #${i+1}</div>
-          </div>`)}
+          </div>`;}) }
         </div>
       </div>
-      <div style=${sty.card({marginBottom:24})}>
-        <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.gold,marginBottom:10}}>SNAKE NOMINATION ORDER</div>
-        ${[0,1,2].map(r=>html`<div key=${r} style=${{marginBottom:8}}>
+      <div style=${S.card({marginBottom:24})}>
+        <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.gold,marginBottom:10}}>SNAKE ORDER</div>
+        ${[0,1,2].map(function(r){return html`<div key=${r} style=${{marginBottom:8}}>
           <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,marginBottom:4}}>ROUND ${r+1}</div>
           <div style=${{display:'flex',flexWrap:'wrap',gap:4}}>
-            ${NOM.slice(r*13,(r+1)*13).map((pi,pos)=>{const pn=state.players[pi]?state.players[pi].name:'';return html`<div key=${pos} style=${{background:C.deep,borderRadius:3,padding:'3px 7px',fontFamily:F.cond,fontSize:11,color:pn===viewer?C.gold:pn==='Trevor'?'rgba(245,197,24,0.6)':C.white,fontWeight:(pn===viewer||pn==='Trevor')?700:400}}>${pn}</div>`;})}
+            ${NOM.slice(r*13,(r+1)*13).map(function(pi,pos){var pn=p.state.players[pi]?p.state.players[pi].name:'';return html`<div key=${pos} style=${{background:C.deep,borderRadius:3,padding:'3px 7px',fontFamily:F.cond,fontSize:11,color:pn===p.viewer?C.gold:pn==='Trevor'?'rgba(245,197,24,0.6)':C.white,fontWeight:(pn===p.viewer||pn==='Trevor')?700:400}}>${pn}</div>`;}) }
           </div>
-        </div>`)}
+        </div>`;}) }
       </div>
-      ${isC?html`
-        <button style=${{...sty.btn('gold'),width:'100%',fontSize:18,padding:16}} onClick=${onStart}>🚀 Start Auction</button>
-        <div style=${{marginTop:14,fontFamily:F.body,fontSize:12,color:C.dim,textAlign:'center',lineHeight:1.5}}>Share this URL with participants — they select their name to join.</div>
-      `:html`<div style=${{...sty.card({padding:14,textAlign:'center'}),border:'1px solid '+C.faint}}>
+      ${p.isC?html`
+        <button style=${{...S.btn('gold'),width:'100%',fontSize:18,padding:16}} onClick=${p.onStart}>🚀 Start Auction</button>
+        <div style=${{marginTop:14,fontFamily:F.body,fontSize:12,color:C.dim,textAlign:'center',lineHeight:1.5}}>Share this URL — participants select their name to join.</div>
+      `:html`<div style=${{...S.card({padding:14,textAlign:'center'}),border:'1px solid '+C.faint}}>
         <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14}}>Waiting for commissioner to start...</div>
         <div style=${{fontFamily:F.body,color:C.dim,fontSize:12,marginTop:6}}>Auto-refreshes every 3 seconds</div>
       </div>`}
@@ -206,90 +242,90 @@ function Lobby({state,isC,viewer,onStart,onShuf}){
   </div>`;
 }
 
-function Lot({lot,players,soldTeams,nomIdx,isC,onSell,onClear}){
-  const[sel,setSel]=useState('');
-  const[bid,setBid]=useState('');
-  const[err,setErr]=useState('');
-  const nom=players[NOM[nomIdx]]?players[NOM[nomIdx]].name:'';
-  if(!lot)return html`<div style=${{...sty.card({padding:20,textAlign:'center'}),border:'1px dashed '+C.faint}}>
+function Lot(p){
+  var _=useState(''),sel=_[0],setSel=_[1];
+  var __=useState(''),bid=__[0],setBid=__[1];
+  var ___=useState(''),err=___[0],setErr=___[1];
+  var nom=p.players[NOM[p.nomIdx]]?p.players[NOM[p.nomIdx]].name:'';
+  if(!p.lot)return html`<div style=${{...S.card({padding:20,textAlign:'center'}),border:'1px dashed '+C.faint}}>
     <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14}}>No team up for bid</div>
     <div style=${{fontFamily:F.cond,color:C.gold,fontSize:12,marginTop:6}}>Waiting for ${nom} to nominate...</div>
   </div>`;
-  const team=TEAMS.find(t=>t.name===lot.name);
-  const go=()=>{
-    const price=parseInt(bid);
-    const pi=players.findIndex(p=>p.name===sel);
+  var team=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===p.lot.name){team=TEAMS[i];break;}}
+  function go(){
+    var price=parseInt(bid);
+    var pi=-1;for(var i=0;i<p.players.length;i++){if(p.players[i].name===sel){pi=i;break;}}
     if(!sel||pi<0){setErr('Select a player');return;}
     if(!price||price<1){setErr('Minimum bid is $1');return;}
-    const pl=players[pi];
+    var pl=p.players[pi];
     if(price>pl.budget){setErr(pl.name+' only has $'+pl.budget);return;}
     if(pl.teams.length>=TPP){setErr(pl.name+' is full');return;}
-    const rem=TPP-pl.teams.length;
+    var rem=TPP-pl.teams.length;
     if(price>pl.budget-(rem-1)){setErr('Max bid: $'+maxBid(pl));return;}
-    onSell(lot.name,pi,price);setSel('');setBid('');setErr('');
-  };
-  return html`<div style=${{...sty.card({padding:0}),border:'2px solid '+C.gold,overflow:'hidden'}}>
+    p.onSell(p.lot.name,pi,price);setSel('');setBid('');setErr('');
+  }
+  return html`<div style=${{...S.card({padding:0}),border:'2px solid '+C.gold,overflow:'hidden'}}>
     <div style=${{background:C.gold,padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-      <div style=${{fontFamily:F.cond,fontSize:12,fontWeight:700,color:C.navy}}>NOW BIDDING · LOT ${nSold(soldTeams)+1}/${TOTAL}</div>
-      ${isC&&html`<button onClick=${onClear} style=${{background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:18,padding:0}}>✕</button>`}
+      <div style=${{fontFamily:F.cond,fontSize:12,fontWeight:700,color:C.navy}}>NOW BIDDING · LOT ${nSold(p.soldTeams)+1}/${TOTAL}</div>
+      ${p.isC&&html`<button onClick=${p.onClear} style=${{background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:18,padding:0}}>✕</button>`}
     </div>
     <div style=${{padding:'20px 16px',textAlign:'center',borderBottom:'1px solid '+C.faint}}>
       <div style=${{fontSize:52,lineHeight:1,marginBottom:8}}>${team?team.flag:''}</div>
-      <div style=${{fontFamily:F.display,fontSize:38,color:C.white}}>${lot.name}</div>
-      <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginTop:4}}>FIFA Rank #${lot.rank}</div>
+      <div style=${{fontFamily:F.display,fontSize:38,color:C.white}}>${p.lot.name}</div>
+      <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginTop:4}}>FIFA Rank #${p.lot.rank}</div>
     </div>
-    ${isC&&html`<div style=${{padding:16}}>
+    ${p.isC&&html`<div style=${{padding:16}}>
       <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
         <div>
-          <label style=${sty.lbl}>Winner</label>
-          <select value=${sel} onChange=${e=>{setSel(e.target.value);setErr('');}} style=${{...sty.inp,cursor:'pointer'}}>
+          <label style=${S.lbl}>Winner</label>
+          <select value=${sel} onChange=${function(e){setSel(e.target.value);setErr('');}} style=${{...S.inp,cursor:'pointer'}}>
             <option value="">Select player...</option>
-            ${players.filter(p=>p.teams.length<TPP).map(p=>html`<option key=${p.name} value=${p.name}>${p.name} ($${p.budget} · max $${maxBid(p)})</option>`)}
+            ${p.players.filter(function(pl){return pl.teams.length<TPP;}).map(function(pl){return html`<option key=${pl.name} value=${pl.name}>${pl.name} ($${pl.budget} · max $${maxBid(pl)})</option>`;}) }
           </select>
         </div>
         <div>
-          <label style=${sty.lbl}>Winning Bid</label>
-          <input style=${sty.inp} type="number" min="1" placeholder="$" value=${bid} onInput=${e=>{setBid(e.target.value);setErr('');}} onKeyDown=${e=>e.key==='Enter'&&go()}/>
+          <label style=${S.lbl}>Winning Bid</label>
+          <input style=${S.inp} type="number" min="1" placeholder="$" value=${bid} onInput=${function(e){setBid(e.target.value);setErr('');}} onKeyDown=${function(e){if(e.key==='Enter')go();}}/>
         </div>
       </div>
       ${err&&html`<div style=${{color:C.red,fontSize:12,marginBottom:8}}>${err}</div>`}
-      <button style=${{...sty.btn('gold'),width:'100%'}} onClick=${go}>✓ Confirm Sale</button>
+      <button style=${{...S.btn('gold'),width:'100%'}} onClick=${go}>✓ Confirm Sale</button>
     </div>`}
   </div>`;
 }
 
-function Cards({players,nom,viewer,soldTeams}){
+function Cards(p){
   return html`<div>
-    <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim,marginBottom:8}}>PLAYERS · ${nSold(soldTeams)}/${TOTAL} TEAMS SOLD</div>
+    <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim,marginBottom:8}}>PLAYERS · ${nSold(p.soldTeams)}/${TOTAL} TEAMS SOLD</div>
     <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-      ${players.map(p=>{
-        const isN=p.name===nom,isS=p.name===viewer,rem=TPP-p.teams.length,done=rem===0;
-        return html`<div key=${p.name} style=${{...sty.card({padding:'10px 12px'}),border:'1px solid '+(isN?C.gold:isS?'rgba(245,197,24,0.35)':'transparent'),opacity:done?0.6:1}}>
+      ${p.players.map(function(pl){
+        var isN=pl.name===p.nom,isS=pl.name===p.viewer,rem=TPP-pl.teams.length,done=rem===0;
+        return html`<div key=${pl.name} style=${{...S.card({padding:'10px 12px'}),border:'1px solid '+(isN?C.gold:isS?'rgba(245,197,24,0.35)':'transparent'),opacity:done?0.6:1}}>
           <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:isS?C.gold:C.white}}>${isN?html`<span style=${{color:C.gold,marginRight:4}}>🎤</span>`:null}${p.name}</div>
-            <div style=${{fontFamily:F.display,fontSize:20,color:done?C.dim:p.budget<=5?C.red:C.gold}}>$${p.budget}</div>
+            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:isS?C.gold:C.white}}>${isN?html`<span style=${{color:C.gold,marginRight:4}}>🎤</span>`:null}${pl.name}</div>
+            <div style=${{fontFamily:F.display,fontSize:20,color:done?C.dim:pl.budget<=5?C.red:C.gold}}>$${pl.budget}</div>
           </div>
-          ${p.teams.length>0?html`<div style=${{marginTop:6}}>
-            ${p.teams.map(t=>{const td=TEAMS.find(x=>x.name===t.name);return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>— $${t.price}</span></div>`;})}
-            ${!done?html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>${rem} slot${rem>1?'s':''} left · max $${maxBid(p)}</div>`:null}
-          </div>`:html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>No teams yet · max $${maxBid(p)}</div>`}
+          ${pl.teams.length>0?html`<div style=${{marginTop:6}}>
+            ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:12,color:C.dim,marginTop:2}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>— $${t.price}</span></div>`;}) }
+            ${!done?html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>${rem} slot${rem>1?'s':''} left · max $${maxBid(pl)}</div>`:null}
+          </div>`:html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>No teams yet · max $${maxBid(pl)}</div>`}
         </div>`;
-      })}
+      }) }
     </div>
   </div>`;
 }
 
-function TList({players,soldTeams,currentLot,onNom}){
-  const[q,setQ]=useState('');
-  const avail=TEAMS.filter(t=>t.name.toLowerCase().includes(q.toLowerCase())&&!soldTeams[t.name]);
-  const sold=TEAMS.filter(t=>soldTeams[t.name]);
+function TList(p){
+  var _=useState(''),q=_[0],setQ=_[1];
+  var avail=TEAMS.filter(function(t){return t.name.toLowerCase().indexOf(q.toLowerCase())>=0&&!p.soldTeams[t.name];});
+  var sold=TEAMS.filter(function(t){return !!p.soldTeams[t.name];});
   return html`<div>
-    <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim,marginBottom:8}}>AVAILABLE (${TEAMS.length-Object.keys(soldTeams).length})</div>
-    <input style=${{...sty.inp,marginBottom:10,fontSize:13}} placeholder="Search..." value=${q} onInput=${e=>setQ(e.target.value)}/>
+    <div style=${{fontFamily:F.cond,fontSize:12,letterSpacing:'0.12em',color:C.dim,marginBottom:8}}>AVAILABLE (${TEAMS.length-Object.keys(p.soldTeams).length})</div>
+    <input style=${{...S.inp,marginBottom:10,fontSize:13}} placeholder="Search..." value=${q} onInput=${function(e){setQ(e.target.value);}}/>
     <div style=${{maxHeight:340,overflowY:'auto'}}>
-      ${avail.map(t=>{
-        const act=currentLot&&currentLot.name===t.name,usa=t.name==='USA';
-        return html`<div key=${t.name} onClick=${()=>!currentLot&&onNom(t)} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px',background:act?C.goldDim:usa?'rgba(0,40,104,0.4)':'transparent',borderBottom:'1px solid '+C.faint,cursor:currentLot?'default':'pointer',borderLeft:usa?'3px solid rgba(178,34,52,0.6)':'3px solid transparent'}}>
+      ${avail.map(function(t){
+        var act=p.currentLot&&p.currentLot.name===t.name,usa=t.name==='USA';
+        return html`<div key=${t.name} onClick=${function(){if(!p.currentLot)p.onNom(t);}} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px',background:act?C.goldDim:usa?'rgba(0,40,104,0.4)':'transparent',borderBottom:'1px solid '+C.faint,cursor:p.currentLot?'default':'pointer',borderLeft:usa?'3px solid rgba(178,34,52,0.6)':'3px solid transparent'}}>
           <div style=${{display:'flex',alignItems:'center',gap:10}}>
             <span style=${{fontSize:20}}>${t.flag}</span>
             <div>
@@ -297,38 +333,39 @@ function TList({players,soldTeams,currentLot,onNom}){
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim}}>FIFA #${t.rank}</div>
             </div>
           </div>
-          ${act?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.gold,fontWeight:700}}>ON THE BLOCK</div>`:!currentLot?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>TAP</div>`:null}
+          ${act?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.gold,fontWeight:700}}>ON THE BLOCK</div>`:!p.currentLot?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>TAP</div>`:null}
         </div>`;
-      })}
+      }) }
     </div>
     ${sold.length>0?html`<div style=${{marginTop:12}}>
       <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,marginBottom:4}}>SOLD (${sold.length})</div>
-      ${sold.map(t=>{const s=soldTeams[t.name];const w=players[s.playerIndex]?players[s.playerIndex].name:'?';return html`<div key=${t.name} style=${{display:'flex',justifyContent:'space-between',padding:'5px 10px',opacity:0.5,borderBottom:'1px solid '+C.faint}}>
+      ${sold.map(function(t){var s=p.soldTeams[t.name];var w=p.players[s.playerIndex]?p.players[s.playerIndex].name:'?';return html`<div key=${t.name} style=${{display:'flex',justifyContent:'space-between',padding:'5px 10px',opacity:0.5,borderBottom:'1px solid '+C.faint}}>
         <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${t.flag} ${t.name}</span>
         <span style=${{fontFamily:F.cond,fontSize:12,color:C.dim}}>${w} · $${s.price}</span>
-      </div>`;})}</div>`:null}
+      </div>`;}) }
+    </div>`:null}
   </div>`;
 }
 
-function CommView({state,onNom,onSell,onClear,onReset}){
-  const[rst,setRst]=useState(false);
-  const nom=nomN(state.players,state.nomIndex);
-  return html`<div style=${sty.page}>
-    <${Hdr} sub=${'LOT '+(nSold(state.soldTeams)+1)+'/'+TOTAL+' · '+nom.toUpperCase()+"'S TURN"}
+function CommView(p){
+  var _=useState(false),rst=_[0],setRst=_[1];
+  var nom=nomN(p.state.players,p.state.nomIndex);
+  return html`<div style=${S.page}>
+    <${Hdr} sub=${'LOT '+(nSold(p.state.soldTeams)+1)+'/'+TOTAL+' · '+nom.toUpperCase()+"'S TURN"}
       right=${html`<div style=${{background:C.grass,borderRadius:4,padding:'4px 10px',fontFamily:F.cond,fontSize:12,fontWeight:700}}>🎛 COMM</div>`}/>
     <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',height:'calc(100vh - 57px)'}}>
       <div style=${{padding:16,overflowY:'auto',borderRight:'1px solid '+C.faint}}>
-        <${TList} players=${state.players} soldTeams=${state.soldTeams} currentLot=${state.currentLot} onNom=${onNom}/>
+        <${TList} players=${p.state.players} soldTeams=${p.state.soldTeams} currentLot=${p.state.currentLot} onNom=${p.onNom}/>
       </div>
       <div style=${{padding:16,overflowY:'auto'}}>
-        <div style=${{marginBottom:20}}><${Lot} lot=${state.currentLot} players=${state.players} soldTeams=${state.soldTeams} nomIdx=${state.nomIndex} isC=${true} onSell=${onSell} onClear=${onClear}/></div>
-        <${Cards} players=${state.players} nom=${nom} viewer="" soldTeams=${state.soldTeams}/>
+        <div style=${{marginBottom:20}}><${Lot} lot=${p.state.currentLot} players=${p.state.players} soldTeams=${p.state.soldTeams} nomIdx=${p.state.nomIndex} isC=${true} onSell=${p.onSell} onClear=${p.onClear}/></div>
+        <${Cards} players=${p.state.players} nom=${nom} viewer="" soldTeams=${p.state.soldTeams}/>
         <div style=${{marginTop:24,borderTop:'1px solid '+C.faint,paddingTop:16}}>
-          ${!rst?html`<button style=${sty.btn('ghost',{width:'100%',fontSize:12})} onClick=${()=>setRst(true)}>Reset Auction</button>`:html`<div style=${{textAlign:'center'}}>
+          ${!rst?html`<button style=${S.btn('ghost',{width:'100%',fontSize:12})} onClick=${function(){setRst(true);}}>Reset Auction</button>`:html`<div style=${{textAlign:'center'}}>
             <div style=${{fontFamily:F.cond,color:C.red,fontSize:13,marginBottom:10}}>Erase all progress?</div>
             <div style=${{display:'flex',gap:8}}>
-              <button style=${sty.btn('red',{flex:1})} onClick=${onReset}>Yes</button>
-              <button style=${sty.btn('ghost',{flex:1})} onClick=${()=>setRst(false)}>No</button>
+              <button style=${S.btn('red',{flex:1})} onClick=${p.onReset}>Yes</button>
+              <button style=${S.btn('ghost',{flex:1})} onClick=${function(){setRst(false);}}>No</button>
             </div>
           </div>`}
         </div>
@@ -337,16 +374,16 @@ function CommView({state,onNom,onSell,onClear,onReset}){
   </div>`;
 }
 
-function PartView({state,viewer,onRef}){
-  const[rfsh,setRfsh]=useState(false);
-  const nom=nomN(state.players,state.nomIndex);
-  const me=state.players.find(p=>p.name===viewer);
-  const go=async()=>{setRfsh(true);await onRef();setTimeout(()=>setRfsh(false),600);};
-  return html`<div style=${sty.page}>
-    <${Hdr} sub=${'LOT '+(nSold(state.soldTeams)+1)+'/'+TOTAL+' · '+nom.toUpperCase()+' NOMINATES'}
+function PartView(p){
+  var _=useState(false),rfsh=_[0],setRfsh=_[1];
+  var nom=nomN(p.state.players,p.state.nomIndex);
+  var me=null;for(var i=0;i<p.state.players.length;i++){if(p.state.players[i].name===p.viewer){me=p.state.players[i];break;}}
+  function go(){setRfsh(true);p.onRef();setTimeout(function(){setRfsh(false);},600);}
+  return html`<div style=${S.page}>
+    <${Hdr} sub=${'LOT '+(nSold(p.state.soldTeams)+1)+'/'+TOTAL+' · '+nom.toUpperCase()+' NOMINATES'}
       right=${html`<button onClick=${go} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
     <div style=${{maxWidth:480,margin:'0 auto',padding:16}}>
-      ${me?html`<div style=${{...sty.card({padding:'12px 14px',marginBottom:16}),border:'1px solid '+C.gold}}>
+      ${me?html`<div style=${{...S.card({padding:'12px 14px',marginBottom:16}),border:'1px solid '+C.gold}}>
         <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
             <div style=${{fontFamily:F.display,fontSize:22,color:C.gold}}>${me.name}</div>
@@ -355,91 +392,114 @@ function PartView({state,viewer,onRef}){
           <div style=${{fontFamily:F.display,fontSize:40,color:C.gold}}>$${me.budget}</div>
         </div>
         ${me.teams.length>0?html`<div style=${{marginTop:8,borderTop:'1px solid '+C.faint,paddingTop:8,display:'flex',gap:10,flexWrap:'wrap'}}>
-          ${me.teams.map(t=>{const td=TEAMS.find(x=>x.name===t.name);return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:13}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>$${t.price}</span></div>`;})}
+          ${me.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{fontFamily:F.cond,fontSize:13}}>${td?td.flag:''} ${t.name} <span style=${{color:C.gold}}>$${t.price}</span></div>`;}) }
         </div>`:null}
       </div>`:null}
-      <div style=${{marginBottom:20}}><${Lot} lot=${state.currentLot} players=${state.players} soldTeams=${state.soldTeams} nomIdx=${state.nomIndex} isC=${false}/></div>
-      <${Cards} players=${state.players} nom=${nom} viewer=${viewer} soldTeams=${state.soldTeams}/>
+      <div style=${{marginBottom:20}}><${Lot} lot=${p.state.currentLot} players=${p.state.players} soldTeams=${p.state.soldTeams} nomIdx=${p.state.nomIndex} isC=${false}/></div>
+      <${Cards} players=${p.state.players} nom=${nom} viewer=${p.viewer} soldTeams=${p.state.soldTeams}/>
       <div style=${{textAlign:'center',fontFamily:F.body,fontSize:11,color:C.dim,marginTop:16}}>Auto-refreshes every 3s · tap ↻ now</div>
     </div>
   </div>`;
 }
 
-function Done({state}){
-  return html`<div style=${sty.page}>
+function Done(p){
+  return html`<div style=${S.page}>
     <${Hdr} sub="AUCTION COMPLETE"/>
     <div style=${{maxWidth:600,margin:'0 auto',padding:'24px 16px'}}>
       <div style=${{textAlign:'center',marginBottom:28}}>
-        <div style=${sty.hd(52)}>AUCTION</div>
-        <div style=${{...sty.hd(52),color:C.gold}}>COMPLETE</div>
-        <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14,marginTop:6}}>All 39 teams claimed · Tournament starts June 11</div>
+        <div style=${S.hd(52)}>AUCTION</div>
+        <div style=${{...S.hd(52),color:C.gold}}>COMPLETE</div>
       </div>
       <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-        ${state.players.map(p=>html`<div key=${p.name} style=${sty.card({padding:14})}>
+        ${p.state.players.map(function(pl){return html`<div key=${pl.name} style=${S.card({padding:14})}>
           <div style=${{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:16}}>${p.name}</div>
-            <div style=${{fontFamily:F.cond,fontSize:14,color:C.dim}}>$${BUDGET-p.budget} spent</div>
+            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:16}}>${pl.name}</div>
+            <div style=${{fontFamily:F.cond,fontSize:14,color:C.dim}}>$${BUDGET-pl.budget} spent</div>
           </div>
-          ${p.teams.map(t=>{const td=TEAMS.find(x=>x.name===t.name);return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid '+C.faint}}>
+          ${pl.teams.map(function(t){var td=null;for(var i=0;i<TEAMS.length;i++){if(TEAMS[i].name===t.name){td=TEAMS[i];break;}}return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid '+C.faint}}>
             <div style=${{fontFamily:F.cond,fontSize:13}}>${td?td.flag:''} ${t.name}</div>
             <div style=${{fontFamily:F.display,fontSize:18,color:C.gold}}>$${t.price}</div>
-          </div>`;})}
-          <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:6}}>$${p.budget} remaining</div>
-        </div>`)}
+          </div>`;}) }
+        </div>`;}) }
       </div>
     </div>
   </div>`;
 }
 
-function App(){
-  const[state,setState]=useState(null);
-  const[loading,setLoading]=useState(true);
-  const[isC,setIsC]=useState(false);
-  const[viewer,setViewer]=useState('');
-  const tmr=useRef(null);
+// ── App ───────────────────────────────────────────────────────────────────────
+function App(p){
+  var _=useState(p.init),state=_[0],setState=_[1];
+  var __=useState(false),isC=__[0],setIsC=__[1];
+  var ___=useState(''),viewer=___[0],setViewer=___[1];
+  var tmr=useRef(null);
 
-  useEffect(()=>{
-    let done=false;
-    const safety=setTimeout(()=>{
-      if(!done){done=true;console.warn('Firebase timed out — using default state');setState(INIT);setLoading(false);}
-    },5000);
-    load().then(s=>{
-      if(!done){done=true;clearTimeout(safety);setState(s||INIT);setLoading(false);}
-    });
-  },[]);
+  function persist(ns){setState(ns);saveFB(ns);}
 
-  useEffect(()=>{
-    const phase=state?state.phase:null;
-    const go=!isC&&(phase==='auction'||phase==='lobby');
-    if(go){tmr.current=setInterval(async()=>{const s=await load();if(s)setState(s);},3000);}
-    return()=>clearInterval(tmr.current);
-  },[isC,state?state.phase:null]);
+  function refresh(){
+    loadFB().then(function(s){if(s)setState(s);});
+  }
 
-  const persist=async ns=>{setState(ns);await save(ns);};
-  const refresh=async()=>{const s=await load();if(s)setState(s);};
+  useEffect(function(){
+    if(!isC&&(state.phase==='auction'||state.phase==='lobby')){
+      tmr.current=setInterval(function(){loadFB().then(function(s){if(s)setState(s);});},3000);
+    }
+    return function(){clearInterval(tmr.current);};
+  },[isC,state.phase]);
 
-  if(loading||!state)return html`<${Spin}/>`;
-  if(state.phase==='setup')return html`<${Setup} onDone=${async p=>{const ns={...state,pin:p,phase:'lobby'};await persist(ns);setIsC(true);}}/>`;
-  if(!isC&&!viewer)return html`<${Landing} state=${state} onJoin=${n=>setViewer(n)} onComm=${(p,se)=>{if(p===state.pin)setIsC(true);else se('Wrong PIN');}}/>`;
-  if(state.phase==='lobby')return html`<${Lobby} state=${state} isC=${isC} viewer=${viewer} onStart=${()=>persist({...state,phase:'auction'})} onShuf=${()=>persist({...state,players:shuffle(state.players)})}/>`;
+  if(state.phase==='setup'){
+    return html`<${Setup} onDone=${function(pin){var ns=Object.assign({},state,{pin:pin,phase:'lobby'});persist(ns);setIsC(true);}}/>`;
+  }
+  if(!isC&&!viewer){
+    return html`<${Landing} state=${state} onJoin=${function(n){setViewer(n);}} onComm=${function(pin,setErr){if(pin===state.pin)setIsC(true);else setErr('Wrong PIN');}}/>`;
+  }
+  if(state.phase==='lobby'){
+    return html`<${Lobby} state=${state} isC=${isC} viewer=${viewer}
+      onStart=${function(){persist(Object.assign({},state,{phase:'auction'}));}}
+      onShuf=${function(){persist(Object.assign({},state,{players:shuffle(state.players)}));}}/>`;
+  }
   if(state.phase==='auction'){
-    if(isC)return html`<${CommView} state=${state}
-      onNom=${t=>persist({...state,currentLot:t})}
-      onSell=${(nm,pi,pr)=>{
-        const np=state.players.map((p,i)=>i!==pi?p:{...p,budget:p.budget-pr,teams:[...p.teams,{name:nm,price:pr}]});
-        const ns={...state.soldTeams,[nm]:{playerIndex:pi,price:pr}};
-        const tot=Object.keys(ns).length;
-        persist({...state,players:np,soldTeams:ns,currentLot:null,nomIndex:state.nomIndex+1,phase:tot>=TOTAL?'complete':'auction'});
-      }}
-      onClear=${()=>persist({...state,currentLot:null})}
-      onReset=${()=>persist(INIT)}/>`;
+    if(isC){
+      return html`<${CommView} state=${state}
+        onNom=${function(t){persist(Object.assign({},state,{currentLot:t}));}}
+        onSell=${function(nm,pi,pr){
+          var np=state.players.map(function(pl,i){return i!==pi?pl:Object.assign({},pl,{budget:pl.budget-pr,teams:pl.teams.concat([{name:nm,price:pr}])});});
+          var ns=Object.assign({},state.soldTeams);ns[nm]={playerIndex:pi,price:pr};
+          var tot=Object.keys(ns).length;
+          persist(Object.assign({},state,{players:np,soldTeams:ns,currentLot:null,nomIndex:state.nomIndex+1,phase:tot>=TOTAL?'complete':'auction'}));
+        }}
+        onClear=${function(){persist(Object.assign({},state,{currentLot:null}));}}
+        onReset=${function(){persist(INIT);}}/>`;
+    }
     return html`<${PartView} state=${state} viewer=${viewer} onRef=${refresh}/>`;
   }
   if(state.phase==='complete')return html`<${Done} state=${state}/>`;
-  return html`<${Spin}/>`;
+  return null;
 }
 
-render(html`<${App}/>`,document.getElementById('root'));
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+document.getElementById('status-msg').textContent='FETCHING DATA...';
+
+loadFB().then(function(s){
+  document.getElementById('status').style.display='none';
+  var init=s||INIT;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    React.createElement(App,{init:init})
+  );
+}).catch(function(e){
+  document.getElementById('status-msg').textContent='ERROR: '+e.message;
+});
+
+// Hard safety: if nothing renders in 6 seconds, show setup anyway
+setTimeout(function(){
+  if(document.getElementById('root').children.length===0){
+    document.getElementById('status').style.display='none';
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      React.createElement(App,{init:INIT})
+    );
+  }
+},6000);
+
+})();
 </script>
 </body>
 </html>
