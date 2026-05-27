@@ -133,7 +133,13 @@ function saveFB(s,cb){
 // ── Helpers ───────────────────────────────────────────────────────────────────
 var maxBid=function(p){var r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
 var nSold=function(st){return Object.keys(st).length;};
-var nomN=function(pl,idx){var p=pl[NOM[idx]];return p?p.name:'';};
+var nomN=function(pl,idx){
+  for(var i=idx;i<NOM.length;i++){
+    var p=pl[NOM[i]];
+    if(p&&p.teams.length<TPP) return p.name;
+  }
+  return '';
+};
 var flagImg=function(code,size){
   var c=code.indexOf('-')>=0?code:'fi-'+code;
   var px=size+'px';
