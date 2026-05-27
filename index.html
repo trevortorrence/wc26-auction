@@ -133,7 +133,11 @@ function saveFB(s,cb){
 var maxBid=function(p){var r=TPP-p.teams.length;return r<=0?0:p.budget-(r-1);};
 var nSold=function(st){return Object.keys(st).length;};
 var nomN=function(pl,idx){var p=pl[NOM[idx]];return p?p.name:'';};
-var flagImg=function(code,size){return html`<img src=${'https://flagcdn.com/w'+size+'/'+code+'.png'} style=${{width:size+'px',height:'auto',borderRadius:2,verticalAlign:'middle',display:'inline-block'}} alt=${code}/>`;};
+var flagImg=function(code,size){
+  var src='https://flagcdn.com/w'+size+'/'+code+'.png';
+  var fb='https://flagcdn.com/w'+size+'/'+code.split('-')[0]+'.png';
+  return html`<img src=${src} onError=${function(e){e.target.src=fb;}} style=${{width:size+'px',height:'auto',borderRadius:2,verticalAlign:'middle',display:'inline-block'}} alt=${code}/>`;
+};
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 var S={
