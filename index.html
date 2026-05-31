@@ -146,6 +146,38 @@ var flagImg=function(code,size){
   return html`<span class=${'fi fi-'+code} style=${{width:px,height:Math.round(size*0.75)+'px',display:'inline-block',backgroundSize:'cover',borderRadius:2,verticalAlign:'middle',flexShrink:0}}></span>`;
 };
 
+// ── Phase 2: Tournament ───────────────────────────────────────────────────────
+var STAGES=[
+  {id:'group',label:'Group Stage'},
+  {id:'r32',label:'Round of 32'},
+  {id:'r16',label:'Round of 16'},
+  {id:'qf',label:'Quarterfinal'},
+  {id:'sf',label:'Semifinal'},
+  {id:'final',label:'Final'}
+];
+var STAGE_PTS={group:2,r32:4,r16:8,qf:15,sf:25,final:40};
+
+function calcPts(players,matches){
+  var pts={};
+  for(var i=0;i<players.length;i++) pts[players[i].name]=0;
+  for(var m=0;m<matches.length;m++){
+    var match=matches[m];
+    var s1=parseInt(match.score1),s2=parseInt(match.score2);
+    if(isNaN(s1)||isNaN(s2)) continue;
+    var sp=STAGE_PTS[match.stage]||2;
+    for(var p=0;p<players.length;p++){
+      var pl=players[p],o1=false,o2=false;
+      for(var t=0;t<pl.teams.length;t++){
+        if(pl.teams[t].name===match.team1) o1=true;
+        if(pl.teams[t].name===match.team2) o2=true;
+      }
+      if(o1){if(s1>s2)pts[pl.name]+=sp;else if(s1===s2&&match.stage==='group')pts[pl.name]+=1;}
+      if(o2){if(s2>s1)pts[pl.name]+=sp;else if(s1===s2&&match.stage==='group')pts[pl.name]+=1;}
+    }
+  }
+  return pts;
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 var S={
   page:{minHeight:'100vh',background:C.navy,color:C.white,fontFamily:F.body},
@@ -262,6 +294,7 @@ function Lobby(p){
       </div>
       ${p.isC?html`
         <button style=${{...S.btn('gold'),width:'100%',fontSize:18,padding:16}} onClick=${p.onStart}>🚀 Start Auction</button>
+        <button style=${{...S.btn('ghost',{width:'100%',fontSize:11,marginTop:8,padding:'8px'})}} onClick=${p.onSkip}>⚡ Skip to Tournament (Testing Only)</button>
         <div style=${{marginTop:14,fontFamily:F.body,fontSize:12,color:C.dim,textAlign:'center',lineHeight:1.5}}>Share this URL — participants select their name to join.</div>
       `:html`<div style=${{...S.card({padding:14,textAlign:'center'}),border:'1px solid '+C.faint}}>
         <div style=${{fontFamily:F.cond,color:C.dim,fontSize:14}}>Waiting for commissioner to start...</div>
@@ -412,6 +445,265 @@ function PartTeamList(p){
   </div>`;
 }
 
+// ── Phase 2 Components ────────────────────────────────────────────────────────
+
+function Leaderboard(p){
+  var matches=p.state.matches||[];
+  var pts=calcPts(p.state.players,matches);
+  var ranked=[].concat(p.state.players).sort(function(a,b){return (pts[b.name]||0)-(pts[a.name]||0);});
+  var _=useState(false),rfsh=_[0],setRfsh=_[1];
+  function doRefresh(){setRfsh(true);p.onRef();setTimeout(function(){setRfsh(false);},600);}
+  return html`<div style=${S.page}>
+    <${Hdr} sub="TOURNAMENT LEADERBOARD"
+      right=${html`<button onClick=${doRefresh} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
+    <div style=${{maxWidth:600,margin:'0 auto',padding:16}}>
+      ${p.isC&&html`<div style=${{display:'flex',gap:8,marginBottom:16}}>
+        <button style=${{...S.btn('gold'),flex:1}} onClick=${p.onManage}>📋 Update Results</button>
+      </div>`}
+      <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,letterSpacing:'0.1em',marginBottom:10}}>
+        ${matches.length} RESULTS RECORDED · JUNE 11 – JULY 19
+      </div>
+      ${ranked.map(function(pl,i){
+        var score=pts[pl.name]||0;
+        var isLead=i===0&&score>0;
+        return html`<div key=${pl.name} style=${{...S.card({padding:'14px 16px',marginBottom:8}),border:'1px solid '+(isLead?C.gold:C.faint),position:'relative',overflow:'hidden'}}>
+          ${isLead&&html`<div style=${{position:'absolute',top:0,left:0,right:0,height:3,background:C.gold}}></div>`}
+          <div style=${{display:'flex',alignItems:'center',gap:12}}>
+            <div style=${{fontFamily:F.display,fontSize:34,color:isLead?C.gold:C.dim,width:32,textAlign:'center',lineHeight:1}}>${i+1}</div>
+            <div style=${{flex:1}}>
+              <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:18,color:C.white}}>${pl.name}</div>
+                <div style=${{fontFamily:F.display,fontSize:30,color:score>0?C.gold:C.dim}}>${score}</div>
+              </div>
+              <div style=${{display:'flex',gap:6,flexWrap:'wrap'}}>
+                ${pl.teams.map(function(t){
+                  var td=null;for(var j=0;j<TEAMS.length;j++){if(TEAMS[j].name===t.name){td=TEAMS[j];break;}}
+                  return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',gap:5,background:C.deep,borderRadius:4,padding:'3px 8px'}}>
+                    ${td?flagImg(td.code,16):null}
+                    <span style=${{fontFamily:F.cond,fontSize:11,color:C.white}}>${t.name}</span>
+                  </div>`;
+                })}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      })}
+      ${!p.isC&&html`<div style=${{textAlign:'center',fontFamily:F.body,fontSize:11,color:C.dim,marginTop:12}}>Auto-refreshes every 3s · tap ↻ to refresh now</div>`}
+    </div>
+  </div>`;
+}
+
+function MatchForm(p){
+  var _1=useState(p.match?p.match.stage:'group'),stage=_1[0],setStage=_1[1];
+  var _2=useState(p.match?p.match.team1:''),t1=_2[0],setT1=_2[1];
+  var _3=useState(p.match?p.match.team2:''),t2=_3[0],setT2=_3[1];
+  var _4=useState(p.match?String(p.match.score1):''),s1=_4[0],setS1=_4[1];
+  var _5=useState(p.match?String(p.match.score2):''),s2=_5[0],setS2=_5[1];
+  var _6=useState(''),err=_6[0],setErr=_6[1];
+  var sel={...S.inp,cursor:'pointer'};
+
+  function save(){
+    if(!t1||!t2){setErr('Select both teams');return;}
+    if(t1===t2){setErr('Teams must be different');return;}
+    if(s1===''||s2===''){setErr('Enter scores');return;}
+    var n1=parseInt(s1),n2=parseInt(s2);
+    if(isNaN(n1)||isNaN(n2)||n1<0||n2<0){setErr('Invalid scores');return;}
+    p.onSave({id:p.match?p.match.id:(t1+'-'+t2+'-'+stage+'-'+Date.now()),stage:stage,team1:t1,team2:t2,score1:n1,score2:n2});
+  }
+
+  return html`<div style=${S.card({marginBottom:12})}>
+    <div style=${{fontFamily:F.cond,fontSize:13,color:C.gold,marginBottom:12}}>${p.match?'EDIT RESULT':'ADD RESULT'}</div>
+    <div style=${{marginBottom:10}}>
+      <label style=${S.lbl}>Stage</label>
+      <select value=${stage} onChange=${function(e){setStage(e.target.value);}} style=${sel}>
+        ${STAGES.map(function(st){return html`<option key=${st.id} value=${st.id}>${st.label}</option>`;})}
+      </select>
+    </div>
+    <div style=${{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:8,alignItems:'end',marginBottom:10}}>
+      <div>
+        <label style=${S.lbl}>Team 1</label>
+        <select value=${t1} onChange=${function(e){setT1(e.target.value);}} style=${sel}>
+          <option value="">Select...</option>
+          ${TEAMS.map(function(t){return html`<option key=${t.name} value=${t.name}>${t.name}</option>`;})}
+        </select>
+      </div>
+      <div style=${{fontFamily:F.display,fontSize:20,color:C.dim,paddingBottom:2}}>VS</div>
+      <div>
+        <label style=${S.lbl}>Team 2</label>
+        <select value=${t2} onChange=${function(e){setT2(e.target.value);}} style=${sel}>
+          <option value="">Select...</option>
+          ${TEAMS.map(function(t){return html`<option key=${t.name} value=${t.name}>${t.name}</option>`;})}
+        </select>
+      </div>
+    </div>
+    <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+      <div>
+        <label style=${S.lbl}>Score 1</label>
+        <input style=${S.inp} type="number" min="0" placeholder="0" value=${s1} onInput=${function(e){setS1(e.target.value);}}/>
+      </div>
+      <div>
+        <label style=${S.lbl}>Score 2</label>
+        <input style=${S.inp} type="number" min="0" placeholder="0" value=${s2} onInput=${function(e){setS2(e.target.value);}}/>
+      </div>
+    </div>
+    ${err&&html`<div style=${{color:C.red,fontSize:12,marginBottom:8}}>${err}</div>`}
+    <div style=${{display:'flex',gap:8}}>
+      <button style=${{...S.btn('gold'),flex:1}} onClick=${save}>✓ Save</button>
+      <button style=${{...S.btn('ghost')}} onClick=${p.onCancel}>Cancel</button>
+    </div>
+  </div>`;
+}
+
+function ResultsView(p){
+  var _1=useState(null),editing=_1[0],setEditing=_1[1];
+  var _2=useState(false),adding=_2[0],setAdding=_2[1];
+  var _3=useState(false),fetching=_3[0],setFetching=_3[1];
+  var _4=useState(''),fetchErr=_4[0],setFetchErr=_4[1];
+  var _5=useState(null),preview=_5[0],setPreview=_5[1];
+  var _6=useState(localStorage.getItem('wc26-apikey')||''),apiKey=_6[0],setApiKey=_6[1];
+  var _7=useState(false),showKey=_7[0],setShowKey=_7[1];
+  var _8=useState('group'),filterStage=_8[0],setFilterStage=_8[1];
+
+  var matches=p.state.matches||[];
+
+  function saveMatch(m){
+    var updated=matches.filter(function(x){return x.id!==m.id;});
+    updated.push(m);
+    p.onSave(updated);
+    setEditing(null);setAdding(false);
+  }
+
+  function deleteMatch(id){
+    p.onSave(matches.filter(function(x){return x.id!==id;}));
+  }
+
+  async function fetchFromClaude(){
+    var key=apiKey.trim();
+    if(!key){setFetchErr('Enter your Anthropic API key below');setShowKey(true);return;}
+    localStorage.setItem('wc26-apikey',key);
+    setFetching(true);setFetchErr('');setPreview(null);
+    try{
+      var res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'web-search-20250305'},
+        body:JSON.stringify({
+          model:'claude-haiku-4-5-20251001',max_tokens:2000,
+          tools:[{type:'web_search_20250305',name:'web_search'}],
+          messages:[{role:'user',content:'Search for all completed FIFA World Cup 2026 match results today. Return ONLY a raw JSON array, no markdown or explanation: [{"team1":"France","team2":"Brazil","score1":2,"score2":1,"stage":"group"}]. Stage must be one of: group, r32, r16, qf, sf, final. Only completed matches.'}]
+        })
+      });
+      var data=await res.json();
+      var text='';
+      if(data.content){for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text')text+=data.content[i].text;}}
+      var jm=text.match(/\[[\s\S]*?\]/);
+      if(jm){
+        var parsed=JSON.parse(jm[0]);
+        setPreview(parsed);
+      } else {setFetchErr('No results found — try again or enter manually');}
+    }catch(e){setFetchErr('Error: '+e.message);}
+    setFetching(false);
+  }
+
+  function applyPreview(){
+    var updated=[].concat(matches);
+    preview.forEach(function(fm){
+      if(!fm.team1||!fm.team2) return;
+      var idx=updated.findIndex(function(m){return m.team1===fm.team1&&m.team2===fm.team2&&m.stage===fm.stage;});
+      var obj={id:fm.team1+'-'+fm.team2+'-'+fm.stage,team1:fm.team1,team2:fm.team2,score1:parseInt(fm.score1)||0,score2:parseInt(fm.score2)||0,stage:fm.stage};
+      if(idx>=0)updated[idx]=obj;else updated.push(obj);
+    });
+    p.onSave(updated);
+    setPreview(null);
+  }
+
+  var filtered=matches.filter(function(m){return m.stage===filterStage;});
+
+  return html`<div style=${S.page}>
+    <${Hdr} sub="MATCH RESULTS" right=${html`<button onClick=${p.onBack} style=${{...S.btn('ghost'),padding:'6px 14px',fontSize:12}}>← Back</button>`}/>
+    <div style=${{maxWidth:580,margin:'0 auto',padding:16}}>
+
+      <!-- Fetch via Claude -->
+      <div style=${S.card({marginBottom:16})}>
+        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:C.gold}}>AUTO-FETCH RESULTS</div>
+          <button onClick=${fetchFromClaude} disabled=${fetching}
+            style=${{...S.btn('gold',{padding:'8px 16px',fontSize:13}),opacity:fetching?0.6:1}}>
+            ${fetching?'Fetching...':'🤖 Fetch via Claude'}
+          </button>
+        </div>
+        <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,lineHeight:1.5}}>Uses Claude AI + web search to pull current results. Requires an Anthropic API key.</div>
+        ${fetchErr&&html`<div style=${{color:C.red,fontSize:12,marginTop:8}}>${fetchErr}</div>`}
+        <div style=${{marginTop:10}}>
+          <button onClick=${function(){setShowKey(!showKey);}} style=${{...S.btn('ghost',{fontSize:11,padding:'4px 10px'})}}>
+            ${showKey?'▲ Hide API Key':'▼ Set API Key'}
+          </button>
+          ${showKey&&html`<div style=${{marginTop:8}}>
+            <input style=${S.inp} type="password" placeholder="sk-ant-..." value=${apiKey}
+              onInput=${function(e){setApiKey(e.target.value);}}/>
+            <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>Stored in your browser only. Never shared.</div>
+          </div>`}
+        </div>
+        ${preview&&html`<div style=${{marginTop:12,borderTop:'1px solid '+C.faint,paddingTop:12}}>
+          <div style=${{fontFamily:F.cond,fontSize:12,color:C.gold,marginBottom:8}}>PREVIEW — ${preview.length} RESULTS FOUND</div>
+          ${preview.map(function(m,i){return html`<div key=${i} style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginBottom:4}}>
+            ${m.team1} ${m.score1} – ${m.score2} ${m.team2} <span style=${{color:C.dim,fontSize:11}}>(${m.stage})</span>
+          </div>`;})}
+          <div style=${{display:'flex',gap:8,marginTop:10}}>
+            <button style=${S.btn('gold',{flex:1})} onClick=${applyPreview}>✓ Apply All</button>
+            <button style=${S.btn('ghost')} onClick=${function(){setPreview(null);}}>Discard</button>
+          </div>
+        </div>`}
+      </div>
+
+      <!-- Manual entry -->
+      <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:C.white}}>MANUAL ENTRY</div>
+        ${!adding&&!editing&&html`<button style=${S.btn('gold',{padding:'8px 14px',fontSize:13})} onClick=${function(){setAdding(true);}}>+ Add Result</button>`}
+      </div>
+
+      ${(adding||editing)&&html`<${MatchForm}
+        match=${editing}
+        onSave=${saveMatch}
+        onCancel=${function(){setAdding(false);setEditing(null);}}/>`}
+
+      <!-- Stage filter tabs -->
+      <div style=${{display:'flex',gap:4,flexWrap:'wrap',marginBottom:12}}>
+        ${STAGES.map(function(st){
+          var cnt=matches.filter(function(m){return m.stage===st.id;}).length;
+          return html`<button key=${st.id} onClick=${function(){setFilterStage(st.id);}}
+            style=${{...S.btn(filterStage===st.id?'gold':'ghost',{fontSize:11,padding:'5px 10px'})}}>
+            ${st.label} ${cnt>0?html`<span style=${{opacity:0.7}}>(${cnt})</span>`:''}
+          </button>`;
+        })}
+      </div>
+
+      <!-- Match list -->
+      ${filtered.length===0&&html`<div style=${{textAlign:'center',fontFamily:F.cond,color:C.dim,padding:'20px 0',fontSize:13}}>No ${STAGES.find(function(s){return s.id===filterStage;}).label} results yet</div>`}
+      ${filtered.map(function(m){
+        var t1=TEAMS.find(function(t){return t.name===m.team1;})||{code:'',rank:0};
+        var t2=TEAMS.find(function(t){return t.name===m.team2;})||{code:'',rank:0};
+        return html`<div key=${m.id} style=${{...S.card({padding:'12px 14px',marginBottom:8}),border:'1px solid '+C.faint}}>
+          <div style=${{display:'flex',alignItems:'center',gap:8}}>
+            <div style=${{flex:1,display:'flex',alignItems:'center',gap:6}}>
+              ${flagImg(t1.code,20)}
+              <span style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:m.score1>m.score2?C.gold:C.white}}>${m.team1}</span>
+            </div>
+            <div style=${{fontFamily:F.display,fontSize:22,color:C.white,letterSpacing:'0.04em',minWidth:60,textAlign:'center'}}>${m.score1} – ${m.score2}</div>
+            <div style=${{flex:1,display:'flex',alignItems:'center',gap:6,justifyContent:'flex-end'}}>
+              <span style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:m.score2>m.score1?C.gold:C.white}}>${m.team2}</span>
+              ${flagImg(t2.code,20)}
+            </div>
+          </div>
+          <div style=${{display:'flex',justifyContent:'flex-end',gap:6,marginTop:8}}>
+            <button onClick=${function(){setEditing(m);setAdding(false);}} style=${S.btn('ghost',{fontSize:11,padding:'4px 10px'})}>✏ Edit</button>
+            <button onClick=${function(){if(confirm('Delete this result?'))deleteMatch(m.id);}} style=${S.btn('red',{fontSize:11,padding:'4px 10px'})}>✕</button>
+          </div>
+        </div>`;
+      })}
+    </div>
+  </div>`;
+}
+
 function CommView(p){
   var _=useState(false),rst=_[0],setRst=_[1];
   var nom=nomN(p.state.players,p.state.nomIndex);
@@ -503,6 +795,7 @@ function App(p){
   var tmr=useRef(null);
 
   var ____=useState(''),saveMsg=____[0],setSaveMsg=____[1];
+  var _5=useState(false),managing=_5[0],setManaging=_5[1];
 
   function persist(ns){
     setState(ns);
@@ -518,7 +811,7 @@ function App(p){
   }
 
   useEffect(function(){
-    if(!isC&&(state.phase==='auction'||state.phase==='lobby')){
+    if(!isC&&(state.phase==='auction'||state.phase==='lobby'||state.phase==='tournament')){
       tmr.current=setInterval(function(){loadFB().then(function(s){if(s)setState(s);});},3000);
     }
     return function(){clearInterval(tmr.current);};
@@ -536,8 +829,18 @@ function App(p){
   if(state.phase==='lobby'){
     return html`<${Lobby} state=${state} isC=${isC} viewer=${viewer}
       onStart=${function(){persist(Object.assign({},state,{phase:'auction'}));}}
-      onShuf=${function(){persist(Object.assign({},state,{players:shuffle(state.players)}));}}/>`;
-  }
+      onShuf=${function(){persist(Object.assign({},state,{players:shuffle(state.players)}));}}
+      onSkip=${function(){
+        // Randomly distribute 39 teams (first 39 by ranking) across all 13 players
+        var teamPool=TEAMS.slice(0,39).sort(function(){return Math.random()-0.5;});
+        var newPlayers=state.players.map(function(p,i){
+          var myTeams=teamPool.slice(i*TPP,(i+1)*TPP).map(function(t){return{name:t.name,price:Math.floor(Math.random()*40)+5};});
+          return Object.assign({},p,{teams:myTeams,budget:0});
+        });
+        var sold={};
+        newPlayers.forEach(function(p){p.teams.forEach(function(t){sold[t.name]={playerIndex:newPlayers.indexOf(p),price:t.price};});});
+        persist(Object.assign({},state,{phase:'tournament',players:newPlayers,soldTeams:sold,matches:[]}));
+      }}/>`;  }
   if(state.phase==='auction'){
     if(isC){
       return html`<${CommView} state=${state}
@@ -546,12 +849,22 @@ function App(p){
           var np=state.players.map(function(pl,i){return i!==pi?pl:Object.assign({},pl,{budget:pl.budget-pr,teams:pl.teams.concat([{name:nm,price:pr}])});});
           var ns=Object.assign({},state.soldTeams);ns[nm]={playerIndex:pi,price:pr};
           var tot=Object.keys(ns).length;
-          persist(Object.assign({},state,{players:np,soldTeams:ns,currentLot:null,nomIndex:state.nomIndex+1,phase:tot>=TOTAL?'complete':'auction'}));
+          persist(Object.assign({},state,{players:np,soldTeams:ns,currentLot:null,nomIndex:state.nomIndex+1,phase:tot>=TOTAL?'tournament':'auction',matches:state.matches||[]}));
         }}
         onClear=${function(){persist(Object.assign({},state,{currentLot:null}));}}
         onReset=${function(){persist(INIT);}}/>`;
     }
     return html`<${PartView} state=${state} viewer=${viewer} onRef=${refresh}/>`;
+  }
+  if(state.phase==='tournament'){
+    if(isC&&managing){
+      return html`<${ResultsView} state=${state}
+        onBack=${function(){setManaging(false);}}
+        onSave=${function(matches){persist(Object.assign({},state,{matches:matches}));setManaging(false);}}/>`;
+    }
+    return html`<${Leaderboard} state=${state} isC=${isC}
+      onManage=${function(){setManaging(true);}}
+      onRef=${refresh}/>`;
   }
   if(state.phase==='complete')return html`<${Done} state=${state}/>`;
   return null;
