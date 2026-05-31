@@ -480,6 +480,27 @@ function PartTeamList(p){
 
 // ── Phase 2 Components ────────────────────────────────────────────────────────
 
+function getLastResult(player,matches){
+  for(var i=matches.length-1;i>=0;i--){
+    var m=matches[i];
+    var o1=false,o2=false;
+    for(var j=0;j<player.teams.length;j++){
+      if(player.teams[j].name===m.team1) o1=true;
+      if(player.teams[j].name===m.team2) o2=true;
+    }
+    if(!o1&&!o2) continue;
+    var s1=parseInt(m.score1),s2=parseInt(m.score2);
+    var sp=STAGE_PTS[m.stage]||2;
+    var myTeam=o1?m.team1:m.team2;
+    var mine=o1?s1:s2,opp=o1?s2:s1;
+    var oppTeam=o1?m.team2:m.team1;
+    var earned=mine>opp?sp:(mine===opp&&m.stage==='group'?1:0);
+    var stageLabel=STAGES.find(function(s){return s.id===m.stage;});
+    return {myTeam:myTeam,oppTeam:oppTeam,mine:mine,opp:opp,earned:earned,stage:stageLabel?stageLabel.label:m.stage,result:mine>opp?'W':mine===opp?'D':'L'};
+  }
+  return null;
+}
+
 function Leaderboard(p){
   var matches=p.state.matches||[];
   var pts=calcPts(p.state.players,matches);
@@ -496,19 +517,30 @@ function Leaderboard(p){
       <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,letterSpacing:'0.1em',marginBottom:10}}>
         ${matches.length} RESULTS RECORDED · JUNE 11 – JULY 19
       </div>
+
       ${ranked.map(function(pl,i){
         var score=pts[pl.name]||0;
         var isLead=i===0&&score>0;
-        return html`<div key=${pl.name} style=${{...S.card({padding:'14px 16px',marginBottom:8}),border:'1px solid '+(isLead?C.gold:C.faint),position:'relative',overflow:'hidden'}}>
+        var isSelf=pl.name===p.viewer;
+        var last=getLastResult(pl,matches);
+        return html`<div key=${pl.name} style=${{...S.card({padding:'14px 16px',marginBottom:8}),
+          border:'2px solid '+(isSelf?C.gold:isLead?'rgba(245,197,24,0.4)':C.faint),
+          position:'relative',overflow:'hidden',
+          background:isSelf?'rgba(245,197,24,0.06)':C.mid}}>
           ${isLead&&html`<div style=${{position:'absolute',top:0,left:0,right:0,height:3,background:C.gold}}></div>`}
           <div style=${{display:'flex',alignItems:'center',gap:12}}>
             <div style=${{fontFamily:F.display,fontSize:34,color:isLead?C.gold:C.dim,width:32,textAlign:'center',lineHeight:1}}>${i+1}</div>
             <div style=${{flex:1}}>
               <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:18,color:C.white}}>${pl.name}</div>
+                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:18,color:isSelf?C.gold:C.white}}>
+                  ${isSelf?html`<span style=${{color:C.gold,marginRight:4}}>▶</span>`:''}${pl.name}
+                  ${isSelf?html`<span style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6,fontWeight:400}}>(you)</span>`:''}
+                </div>
                 <div style=${{fontFamily:F.display,fontSize:30,color:score>0?C.gold:C.dim}}>${score}</div>
               </div>
-              <div style=${{display:'flex',gap:6,flexWrap:'wrap'}}>
+
+              <!-- Team flags -->
+              <div style=${{display:'flex',gap:6,flexWrap:'wrap',marginBottom:last?8:0}}>
                 ${pl.teams.map(function(t){
                   var td=null;for(var j=0;j<TEAMS.length;j++){if(TEAMS[j].name===t.name){td=TEAMS[j];break;}}
                   return html`<div key=${t.name} style=${{display:'flex',alignItems:'center',gap:5,background:C.deep,borderRadius:4,padding:'3px 8px'}}>
@@ -517,10 +549,40 @@ function Leaderboard(p){
                   </div>`;
                 })}
               </div>
+
+              <!-- Last relevant result -->
+              ${last&&html`<div style=${{display:'flex',alignItems:'center',gap:8,borderTop:'1px solid '+C.faint,paddingTop:7,marginTop:2}}>
+                <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,flex:1}}>
+                  Last: ${last.myTeam} ${last.mine}–${last.opp} ${last.oppTeam}
+                  <span style=${{color:C.dim,marginLeft:4}}>(${last.stage})</span>
+                </div>
+                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:12,
+                  color:last.earned>0?C.gold:last.result==='D'?C.dim:C.red,
+                  background:last.earned>0?'rgba(245,197,24,0.12)':last.result==='D'?C.faint:'rgba(208,2,27,0.12)',
+                  borderRadius:3,padding:'2px 8px'}}>
+                  ${last.earned>0?'+'+last.earned+' pts':last.result==='D'?'Draw':'No pts'}
+                </div>
+              </div>`}
             </div>
           </div>
         </div>`;
       })}
+
+      <!-- Points key -->
+      <div style=${{...S.card({padding:'12px 16px'}),border:'1px solid '+C.faint,marginTop:8}}>
+        <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.dim,marginBottom:8}}>POINTS GUIDE</div>
+        <div style=${{display:'flex',flexWrap:'wrap',gap:'6px 16px'}}>
+          ${[
+            {label:'Group Win',pts:2},{label:'Draw',pts:1},
+            {label:'R32 Win',pts:4},{label:'R16 Win',pts:8},
+            {label:'QF Win',pts:15},{label:'SF Win',pts:25},{label:'Final Win',pts:40}
+          ].map(function(k){return html`<div key=${k.label} style=${{display:'flex',alignItems:'center',gap:5}}>
+            <span style=${{fontFamily:F.display,fontSize:15,color:C.gold}}>${k.pts}</span>
+            <span style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>${k.label}</span>
+          </div>`;})}
+        </div>
+      </div>
+
       ${!p.isC&&html`<div style=${{textAlign:'center',fontFamily:F.body,fontSize:11,color:C.dim,marginTop:12}}>Auto-refreshes every 3s · tap ↻ to refresh now</div>`}
     </div>
   </div>`;
@@ -897,7 +959,7 @@ function App(p){
         onBack=${function(){setManaging(false);}}
         onSave=${function(matches){persist(Object.assign({},state,{matches:matches}));setManaging(false);}}/>`;
     }
-    return html`<${Leaderboard} state=${state} isC=${isC}
+    return html`<${Leaderboard} state=${state} isC=${isC} viewer=${viewer}
       onManage=${function(){setManaging(true);}}
       onRef=${refresh}/>`;
   }
@@ -931,5 +993,4 @@ setTimeout(function(){
 })();
 </script>
 </body>
-
 </html>
