@@ -205,6 +205,35 @@ function Hdr(p){
   </div>`;
 }
 
+// Test data: distributes top 39 teams across 13 players in snake order
+function makeTestState(pin){
+  // Snake distribution — same order as real auction would use
+  var assignments=[
+    {name:"Trevor",   teams:[{name:"France",price:45},{name:"Egypt",price:18},{name:"Canada",price:22}]},
+    {name:"Allison",  teams:[{name:"Spain",price:40},{name:"Algeria",price:15},{name:"Norway",price:20}]},
+    {name:"Glen",     teams:[{name:"Argentina",price:50},{name:"Australia",price:18},{name:"Panama",price:10}]},
+    {name:"Willow",   teams:[{name:"England",price:38},{name:"South Korea",price:16},{name:"Côte d'Ivoire",price:12}]},
+    {name:"Mike",     teams:[{name:"Portugal",price:35},{name:"Austria",price:14},{name:"Sweden",price:15}]},
+    {name:"Katie",    teams:[{name:"Brazil",price:42},{name:"Ecuador",price:12},{name:"Paraguay",price:8}]},
+    {name:"Josie",    teams:[{name:"Netherlands",price:32},{name:"Türkiye",price:11},{name:"Czechia",price:10}]},
+    {name:"Abby",     teams:[{name:"Morocco",price:28},{name:"Iran",price:10},{name:"Scotland",price:20}]},
+    {name:"Ron",      teams:[{name:"Belgium",price:30},{name:"Switzerland",price:16},{name:"Tunisia",price:8}]},
+    {name:"Sarah",    teams:[{name:"Germany",price:36},{name:"Japan",price:14},{name:"Congo DR",price:5}]},
+    {name:"Adam",     teams:[{name:"Croatia",price:22},{name:"Uruguay",price:18},{name:"Uzbekistan",price:5}]},
+    {name:"Charlie",  teams:[{name:"Colombia",price:18},{name:"USA",price:25},{name:"Qatar",price:5}]},
+    {name:"Nora",     teams:[{name:"Senegal",price:16},{name:"Mexico",price:20},{name:"Iraq",price:5}]}
+  ];
+  var players=assignments.map(function(a){
+    var spent=a.teams.reduce(function(sum,t){return sum+t.price;},0);
+    return {name:a.name,budget:BUDGET-spent,teams:a.teams};
+  });
+  var soldTeams={};
+  players.forEach(function(p,pi){
+    p.teams.forEach(function(t){soldTeams[t.name]={playerIndex:pi,price:t.price};});
+  });
+  return {phase:'tournament',pin:pin,players:players,soldTeams:soldTeams,currentLot:null,nomIndex:TOTAL,soldTeams:soldTeams,matches:[]};
+}
+
 function Setup(p){
   var _=useState(''),pin=_[0],setPin=_[1];
   var __=useState(''),err=__[0],setErr=__[1];
@@ -224,6 +253,10 @@ function Setup(p){
         <input style=${S.inp} type="password" placeholder="e.g. 2026" value=${pin} onInput=${function(e){setPin(e.target.value);setErr('');}} onKeyDown=${function(e){if(e.key==='Enter')go();}}/>
         ${err&&html`<div style=${{color:C.red,fontSize:13,marginTop:8}}>${err}</div>`}
         <button style=${{...S.btn('gold'),marginTop:16,width:'100%'}} onClick=${go}>Create Game →</button>
+        <button style=${{...S.btn('ghost'),marginTop:8,width:'100%',fontSize:12}} onClick=${function(){
+          if(pin.length<2){setErr('Enter a PIN first');return;}
+          p.onTest(pin);
+        }}>🧪 Skip to Tournament (Test Mode)</button>
       </div>
       <div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,textAlign:'center',letterSpacing:'0.08em'}}>13 PLAYERS · $100 BUDGET · 39 TEAMS · SNAKE DRAFT ORDER</div>
     </div>
@@ -820,7 +853,9 @@ function App(p){
   if(state.phase==='setup'){
     return html`<div>
       ${saveMsg?html`<div style=${{background:saveMsg.includes('⚠')?C.red:C.grass,color:C.white,fontFamily:F.cond,fontSize:12,textAlign:'center',padding:'4px'}}>${saveMsg}</div>`:''}
-      <${Setup} onDone=${function(pin){var ns=Object.assign({},state,{pin:pin,phase:'lobby'});persist(ns);setIsC(true);}}/>
+      <${Setup}
+        onDone=${function(pin){var ns=Object.assign({},state,{pin:pin,phase:'lobby'});persist(ns);setIsC(true);}}
+        onTest=${function(pin){var ns=makeTestState(pin);persist(ns);setIsC(true);}}/>
     </div>`;
   }
   if(!isC&&!viewer){
