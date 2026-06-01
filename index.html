@@ -155,7 +155,7 @@ var STAGES=[
   {id:'sf',label:'Semifinal'},
   {id:'final',label:'Final'}
 ];
-var STAGE_PTS={group:2,r32:4,r16:8,qf:15,sf:25,final:40};
+var STAGE_PTS={group:2,r32:4,r16:8,qf:15,sf:25,final:35};
 
 function calcPts(players,matches){
   var pts={};
@@ -480,6 +480,79 @@ function PartTeamList(p){
 
 // ── Phase 2 Components ────────────────────────────────────────────────────────
 
+function TeamModal(p){
+  // p.team = {name, code, rank, group}
+  // p.owner = player name
+  // p.matches = all matches
+  // p.onClose
+  var td=p.team;
+  var relevant=p.matches.filter(function(m){return m.team1===td.name||m.team2===td.name;});
+  var teamTotal=0;
+  relevant.forEach(function(m){
+    var owns1=m.team1===td.name;
+    var s1=parseInt(m.score1),s2=parseInt(m.score2);
+    var sp=STAGE_PTS[m.stage]||2;
+    var mine=owns1?s1:s2,opp=owns1?s2:s1;
+    if(mine>opp)teamTotal+=sp;
+    else if(mine===opp&&m.stage==='group')teamTotal+=1;
+  });
+  return html`<div onClick=${p.onClose} style=${{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div onClick=${function(e){e.stopPropagation();}} style=${{...S.card({padding:0}),width:'100%',maxWidth:400,maxHeight:'80vh',overflow:'auto',border:'2px solid '+C.gold}}>
+      <!-- Header -->
+      <div style=${{background:C.gold,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style=${{display:'flex',alignItems:'center',gap:10}}>
+          ${flagImg(td.code,32)}
+          <div>
+            <div style=${{fontFamily:F.display,fontSize:24,color:C.navy,lineHeight:1}}>${td.name}</div>
+            <div style=${{fontFamily:F.cond,fontSize:11,color:C.navy,opacity:0.7}}>FIFA #${td.rank} · Group ${td.group} · Owned by ${p.owner}</div>
+          </div>
+        </div>
+        <button onClick=${p.onClose} style=${{background:'none',border:'none',cursor:'pointer',color:C.navy,fontSize:20,padding:0,lineHeight:1}}>✕</button>
+      </div>
+
+      <!-- Match history -->
+      <div style=${{padding:16}}>
+        <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.dim,marginBottom:10}}>MATCH HISTORY</div>
+        ${relevant.length===0&&html`<div style=${{fontFamily:F.body,fontSize:13,color:C.dim,textAlign:'center',padding:'16px 0'}}>No results recorded yet</div>`}
+        ${relevant.map(function(m,i){
+          var owns1=m.team1===td.name;
+          var s1=parseInt(m.score1),s2=parseInt(m.score2);
+          var sp=STAGE_PTS[m.stage]||2;
+          var mine=owns1?s1:s2,opp=owns1?s2:s1;
+          var oppName=owns1?m.team2:m.team1;
+          var oppTd=null;for(var j=0;j<TEAMS.length;j++){if(TEAMS[j].name===oppName){oppTd=TEAMS[j];break;}}
+          var earned=mine>opp?sp:(mine===opp&&m.stage==='group'?1:0);
+          var result=mine>opp?'W':mine===opp?'D':'L';
+          var stgLabel=STAGES.find(function(s){return s.id===m.stage;});
+          return html`<div key=${i} style=${{display:'flex',alignItems:'center',gap:10,padding:'9px 0',borderBottom:'1px solid '+C.faint}}>
+            <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,width:16,textAlign:'center',fontWeight:700,
+              color:result==='W'?C.grass:result==='D'?C.dim:C.red}}>${result}</div>
+            <div style=${{flex:1}}>
+              <div style=${{fontFamily:F.cond,fontSize:13,color:C.white}}>
+                ${td.name} ${mine}–${opp} ${oppName}
+                ${oppTd?flagImg(oppTd.code,14):null}
+              </div>
+              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:2}}>${stgLabel?stgLabel.label:m.stage}</div>
+            </div>
+            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:13,
+              color:earned>0?C.gold:result==='D'?C.dim:C.red,
+              background:earned>0?'rgba(245,197,24,0.12)':C.faint,
+              borderRadius:3,padding:'2px 8px',whiteSpace:'nowrap'}}>
+              ${earned>0?'+'+earned:result==='D'?'+1':'–'}
+            </div>
+          </div>`;
+        })}
+
+        <!-- Total -->
+        ${relevant.length>0&&html`<div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,paddingTop:12,borderTop:'1px solid '+C.gold}}>
+          <div style=${{fontFamily:F.cond,fontSize:13,color:C.dim}}>TOTAL FROM ${td.name.toUpperCase()}</div>
+          <div style=${{fontFamily:F.display,fontSize:26,color:C.gold}}>${teamTotal} pts</div>
+        </div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
 function getLastResult(player,matches){
   for(var i=matches.length-1;i>=0;i--){
     var m=matches[i];
@@ -505,9 +578,94 @@ function Leaderboard(p){
   var matches=p.state.matches||[];
   var pts=calcPts(p.state.players,matches);
   var ranked=[].concat(p.state.players).sort(function(a,b){return (pts[b.name]||0)-(pts[a.name]||0);});
-  var _=useState(false),rfsh=_[0],setRfsh=_[1];
+  var _r=useState(false),rfsh=_r[0],setRfsh=_r[1];
+  var _m=useState(null),modal=_m[0],setModal=_m[1];
   function doRefresh(){setRfsh(true);p.onRef();setTimeout(function(){setRfsh(false);},600);}
   return html`<div style=${S.page}>
+    ${modal&&html`<${TeamModal} team=${modal.team} owner=${modal.owner} matches=${matches} onClose=${function(){setModal(null);}}/>`}
+    <${Hdr} sub="TOURNAMENT LEADERBOARD"
+      right=${html`<button onClick=${doRefresh} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
+    <div style=${{maxWidth:600,margin:'0 auto',padding:16}}>
+      ${p.isC&&html`<div style=${{display:'flex',gap:8,marginBottom:16}}>
+        <button style=${{...S.btn('gold'),flex:1}} onClick=${p.onManage}>📋 Update Results</button>
+      </div>`}
+      <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,letterSpacing:'0.1em',marginBottom:10}}>
+        ${matches.length} RESULTS RECORDED · JUNE 11 – JULY 19
+      </div>
+
+      ${ranked.map(function(pl,i){
+        var score=pts[pl.name]||0;
+        var isLead=i===0&&score>0;
+        var isSelf=pl.name===p.viewer;
+        var last=getLastResult(pl,matches);
+        return html`<div key=${pl.name} style=${{...S.card({padding:'14px 16px',marginBottom:8}),
+          border:'2px solid '+(isSelf?C.gold:isLead?'rgba(245,197,24,0.4)':C.faint),
+          position:'relative',overflow:'hidden',
+          background:isSelf?'rgba(245,197,24,0.06)':C.mid}}>
+          ${isLead&&html`<div style=${{position:'absolute',top:0,left:0,right:0,height:3,background:C.gold}}></div>`}
+          <div style=${{display:'flex',alignItems:'center',gap:12}}>
+            <div style=${{fontFamily:F.display,fontSize:34,color:isLead?C.gold:C.dim,width:32,textAlign:'center',lineHeight:1}}>${i+1}</div>
+            <div style=${{flex:1}}>
+              <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:18,color:isSelf?C.gold:C.white}}>
+                  ${isSelf?html`<span style=${{color:C.gold,marginRight:4}}>▶</span>`:''}${pl.name}
+                  ${isSelf?html`<span style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6,fontWeight:400}}>(you)</span>`:''}
+                </div>
+                <div style=${{fontFamily:F.display,fontSize:30,color:score>0?C.gold:C.dim}}>${score}</div>
+              </div>
+
+              <!-- Clickable team pills -->
+              <div style=${{display:'flex',gap:6,flexWrap:'wrap',marginBottom:last?8:0}}>
+                ${pl.teams.map(function(t){
+                  var td=null;for(var j=0;j<TEAMS.length;j++){if(TEAMS[j].name===t.name){td=TEAMS[j];break;}}
+                  return html`<div key=${t.name}
+                    onClick=${function(){if(td)setModal({team:td,owner:pl.name});}}
+                    style=${{display:'flex',alignItems:'center',gap:5,background:C.deep,borderRadius:4,padding:'3px 8px',cursor:'pointer',border:'1px solid transparent',transition:'border-color 0.15s'}}
+                    onMouseEnter=${function(e){e.currentTarget.style.borderColor=C.gold;}}
+                    onMouseLeave=${function(e){e.currentTarget.style.borderColor='transparent';}}>
+                    ${td?flagImg(td.code,16):null}
+                    <span style=${{fontFamily:F.cond,fontSize:11,color:C.white}}>${t.name}</span>
+                  </div>`;
+                })}
+              </div>
+
+              <!-- Last relevant result -->
+              ${last&&html`<div style=${{display:'flex',alignItems:'center',gap:8,borderTop:'1px solid '+C.faint,paddingTop:7,marginTop:2}}>
+                <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,flex:1}}>
+                  Last: ${last.myTeam} ${last.mine}–${last.opp} ${last.oppTeam}
+                  <span style=${{color:C.dim,marginLeft:4}}>(${last.stage})</span>
+                </div>
+                <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:12,
+                  color:last.earned>0?C.gold:last.result==='D'?C.dim:C.red,
+                  background:last.earned>0?'rgba(245,197,24,0.12)':last.result==='D'?C.faint:'rgba(208,2,27,0.12)',
+                  borderRadius:3,padding:'2px 8px'}}>
+                  ${last.earned>0?'+'+last.earned+' pts':last.result==='D'?'Draw':'No pts'}
+                </div>
+              </div>`}
+            </div>
+          </div>
+        </div>`;
+      })}
+
+      <!-- Points key -->
+      <div style=${{...S.card({padding:'12px 16px'}),border:'1px solid '+C.faint,marginTop:8}}>
+        <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.dim,marginBottom:8}}>POINTS GUIDE</div>
+        <div style=${{display:'flex',flexWrap:'wrap',gap:'6px 16px'}}>
+          ${[
+            {label:'Group Win',pts:2},{label:'Draw',pts:1},
+            {label:'R32 Win',pts:4},{label:'R16 Win',pts:8},
+            {label:'QF Win',pts:15},{label:'SF Win',pts:25},{label:'Final Win',pts:35}
+          ].map(function(k){return html`<div key=${k.label} style=${{display:'flex',alignItems:'center',gap:5}}>
+            <span style=${{fontFamily:F.display,fontSize:15,color:C.gold}}>${k.pts}</span>
+            <span style=${{fontFamily:F.cond,fontSize:11,color:C.dim}}>${k.label}</span>
+          </div>`;})}
+        </div>
+      </div>
+
+      ${!p.isC&&html`<div style=${{textAlign:'center',fontFamily:F.body,fontSize:11,color:C.dim,marginTop:12}}>Auto-refreshes every 3s · tap ↻ to refresh now</div>`}
+    </div>
+  </div>`;
+}
     <${Hdr} sub="TOURNAMENT LEADERBOARD"
       right=${html`<button onClick=${doRefresh} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
     <div style=${{maxWidth:600,margin:'0 auto',padding:16}}>
@@ -680,13 +838,23 @@ function ResultsView(p){
     try{
       var res=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'web-search-20250305'},
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key':key,
+          'anthropic-version':'2023-06-01',
+          'anthropic-beta':'web-search-20250305'
+        },
         body:JSON.stringify({
           model:'claude-haiku-4-5-20251001',max_tokens:2000,
           tools:[{type:'web_search_20250305',name:'web_search'}],
           messages:[{role:'user',content:'Search for all completed FIFA World Cup 2026 match results today. Return ONLY a raw JSON array, no markdown or explanation: [{"team1":"France","team2":"Brazil","score1":2,"score2":1,"stage":"group"}]. Stage must be one of: group, r32, r16, qf, sf, final. Only completed matches.'}]
         })
       });
+      if(!res.ok){
+        var errData=await res.json().catch(function(){return {};});
+        setFetchErr('API error '+(res.status)+': '+(errData.error&&errData.error.message||'Check your API key'));
+        setFetching(false);return;
+      }
       var data=await res.json();
       var text='';
       if(data.content){for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text')text+=data.content[i].text;}}
@@ -695,7 +863,13 @@ function ResultsView(p){
         var parsed=JSON.parse(jm[0]);
         setPreview(parsed);
       } else {setFetchErr('No results found — try again or enter manually');}
-    }catch(e){setFetchErr('Error: '+e.message);}
+    }catch(e){
+      if(e.name==='TypeError'&&e.message.includes('fetch')){
+        setFetchErr('Network error — if this persists, your browser may be blocking cross-origin requests. Try Chrome or enter results manually.');
+      } else {
+        setFetchErr('Error: '+e.message);
+      }
+    }
     setFetching(false);
   }
 
