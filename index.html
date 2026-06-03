@@ -1168,9 +1168,11 @@ function BonusPicksScreen(p){
               </div>`;
             })}
             ${!locked&&html`<div>
-              ${saving&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:saving.startsWith('✓')?C.grass:saving.startsWith('⚠')?C.red:C.gold,marginBottom:8,textAlign:'center'}}>${saving}</div>`}
-              <button style=${{...S.btn('gold'),width:'100%'}} onClick=${function(){submitPhase(ph.id);}}>
-                ✓ Save My Picks
+              <button style=${{...S.btn('gold'),width:'100%',
+                background:saving.startsWith('✓')?C.grass:saving.startsWith('⚠')?C.red:C.gold,
+                transition:'background 0.2s'}}
+                onClick=${function(){submitPhase(ph.id);}}>
+                ${saving||'✓ Save My Picks'}
               </button>
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:6,textAlign:'center'}}>
                 You don't need to answer every question — save partial picks and come back any time before the deadline. Picks are hidden from other players until the phase locks.
