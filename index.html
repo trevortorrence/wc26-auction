@@ -824,12 +824,10 @@ function MatchForm(p){
 function ResultsView(p){
   var _1=useState(null),editing=_1[0],setEditing=_1[1];
   var _2=useState(false),adding=_2[0],setAdding=_2[1];
-  var _3=useState(false),fetching=_3[0],setFetching=_3[1];
-  var _4=useState(''),fetchErr=_4[0],setFetchErr=_4[1];
-  var _5=useState(null),preview=_5[0],setPreview=_5[1];
-  var _6=useState(localStorage.getItem('wc26-apikey')||''),apiKey=_6[0],setApiKey=_6[1];
-  var _7=useState(false),showKey=_7[0],setShowKey=_7[1];
-  var _8=useState('group'),filterStage=_8[0],setFilterStage=_8[1];
+  var _3=useState(''),fetchErr=_3[0],setFetchErr=_3[1];
+  var _4=useState(null),preview=_4[0],setPreview=_4[1];
+  var _5=useState(''),pasteText=_5[0],setPasteText=_5[1];
+  var _6=useState('group'),filterStage=_6[0],setFilterStage=_6[1];
 
   var matches=p.state.matches||[];
 
@@ -844,47 +842,20 @@ function ResultsView(p){
     p.onSave(matches.filter(function(x){return x.id!==id;}));
   }
 
-  async function fetchFromClaude(){
-    var key=apiKey.trim();
-    if(!key){setFetchErr('Enter your Anthropic API key below');setShowKey(true);return;}
-    localStorage.setItem('wc26-apikey',key);
-    setFetching(true);setFetchErr('');setPreview(null);
+  var TEAM_NAMES=TEAMS.map(function(t){return t.name;}).join(', ');
+  var CLAUDE_PROMPT='Search the web for all completed FIFA World Cup 2026 match results. Return ONLY a raw JSON array with no markdown or explanation:\n[{"team1":"France","team2":"Brazil","score1":2,"score2":1,"stage":"group"}]\nRules:\n- stage must be: group, r32, r16, qf, sf, or final\n- Only include completed matches with known scores\n- Use EXACTLY these team names: '+TEAM_NAMES;
+
+  function openClaude(){
+    window.open('https://claude.ai/new','_blank');
+    navigator.clipboard.writeText(CLAUDE_PROMPT).catch(function(){});
+  }
+
+  function parsePaste(text){
     try{
-      var res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'x-api-key':key,
-          'anthropic-version':'2023-06-01',
-          'anthropic-beta':'web-search-20250305'
-        },
-        body:JSON.stringify({
-          model:'claude-haiku-4-5-20251001',max_tokens:2000,
-          tools:[{type:'web_search_20250305',name:'web_search'}],
-          messages:[{role:'user',content:'Search for all completed FIFA World Cup 2026 match results today. Return ONLY a raw JSON array, no markdown or explanation: [{"team1":"France","team2":"Brazil","score1":2,"score2":1,"stage":"group"}]. Stage must be one of: group, r32, r16, qf, sf, final. Only completed matches.'}]
-        })
-      });
-      if(!res.ok){
-        var errData=await res.json().catch(function(){return {};});
-        setFetchErr('API error '+(res.status)+': '+(errData.error&&errData.error.message||'Check your API key'));
-        setFetching(false);return;
-      }
-      var data=await res.json();
-      var text='';
-      if(data.content){for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text')text+=data.content[i].text;}}
-      var jm=text.match(/\[[\s\S]*?\]/);
-      if(jm){
-        var parsed=JSON.parse(jm[0]);
-        setPreview(parsed);
-      } else {setFetchErr('No results found — try again or enter manually');}
-    }catch(e){
-      if(e.name==='TypeError'&&e.message.includes('fetch')){
-        setFetchErr('Network error — if this persists, your browser may be blocking cross-origin requests. Try Chrome or enter results manually.');
-      } else {
-        setFetchErr('Error: '+e.message);
-      }
-    }
-    setFetching(false);
+      var jm=text.match(/\[[\s\S]*\]/);
+      if(!jm) return null;
+      return JSON.parse(jm[0]);
+    }catch(e){return null;}
   }
 
   function applyPreview(){
@@ -896,7 +867,7 @@ function ResultsView(p){
       if(idx>=0)updated[idx]=obj;else updated.push(obj);
     });
     p.onSave(updated);
-    setPreview(null);
+    setPreview(null);setPasteText('');
   }
 
   var filtered=matches.filter(function(m){return m.stage===filterStage;});
@@ -905,35 +876,55 @@ function ResultsView(p){
     <${Hdr} sub="MATCH RESULTS" right=${html`<button onClick=${p.onBack} style=${{...S.btn('ghost'),padding:'6px 14px',fontSize:12}}>← Back</button>`}/>
     <div style=${{maxWidth:580,margin:'0 auto',padding:16}}>
 
-      <!-- Fetch via Claude -->
+      <!-- Get results via Claude.ai -->
       <div style=${S.card({marginBottom:16})}>
-        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-          <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:C.gold}}>AUTO-FETCH RESULTS</div>
-          <button onClick=${fetchFromClaude} disabled=${fetching}
-            style=${{...S.btn('gold',{padding:'8px 16px',fontSize:13}),opacity:fetching?0.6:1}}>
-            ${fetching?'Fetching...':'🤖 Fetch via Claude'}
+        <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,color:C.gold,marginBottom:8}}>GET RESULTS VIA CLAUDE.AI</div>
+        <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,lineHeight:1.5,marginBottom:12}}>
+          Uses your Claude.ai subscription — no extra cost, no API key needed.
+        </div>
+        <div style=${{display:'flex',gap:8,marginBottom:12}}>
+          <button style=${{...S.btn('gold'),flex:1}} onClick=${openClaude}>
+            1. Open Claude.ai + Copy Prompt
           </button>
         </div>
-        <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,lineHeight:1.5}}>Uses Claude AI + web search to pull current results. Requires an Anthropic API key.</div>
-        ${fetchErr&&html`<div style=${{color:C.red,fontSize:12,marginTop:8}}>${fetchErr}</div>`}
-        <div style=${{marginTop:10}}>
-          <button onClick=${function(){setShowKey(!showKey);}} style=${{...S.btn('ghost',{fontSize:11,padding:'4px 10px'})}}>
-            ${showKey?'▲ Hide API Key':'▼ Set API Key'}
-          </button>
-          ${showKey&&html`<div style=${{marginTop:8}}>
-            <input style=${S.inp} type="password" placeholder="sk-ant-..." value=${apiKey}
-              onInput=${function(e){setApiKey(e.target.value);}}/>
-            <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>Stored in your browser only. Never shared.</div>
-          </div>`}
+        <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,marginBottom:8}}>
+          Claude.ai will open in a new tab with the prompt already copied. Paste it in, send it, then copy the JSON response and paste it below.
         </div>
+        <label style=${S.lbl}>2. Paste Claude's JSON response here</label>
+        <textarea
+          style=${{...S.inp,height:80,resize:'vertical',fontFamily:'monospace',fontSize:11}}
+          placeholder='[{"team1":"France","team2":"Brazil","score1":2,"score2":1,"stage":"group"},...]'
+          value=${pasteText}
+          onInput=${function(e){
+            setPasteText(e.target.value);
+            setFetchErr('');
+            setPreview(null);
+          }}/>
+        ${fetchErr&&html`<div style=${{color:C.red,fontSize:12,marginTop:6}}>${fetchErr}</div>`}
+        <button style=${{...S.btn('gold',{width:'100%',marginTop:8})}}
+          onClick=${function(){
+            var parsed=parsePaste(pasteText);
+            if(!parsed||!parsed.length){setFetchErr('Could not parse JSON — make sure you copied the full array');return;}
+            setPreview(parsed);setFetchErr('');
+          }}>
+          3. Preview & Import
+        </button>
+
         ${preview&&html`<div style=${{marginTop:12,borderTop:'1px solid '+C.faint,paddingTop:12}}>
           <div style=${{fontFamily:F.cond,fontSize:12,color:C.gold,marginBottom:8}}>PREVIEW — ${preview.length} RESULTS FOUND</div>
-          ${preview.map(function(m,i){return html`<div key=${i} style=${{fontFamily:F.cond,fontSize:13,color:C.dim,marginBottom:4}}>
-            ${m.team1} ${m.score1} – ${m.score2} ${m.team2} <span style=${{color:C.dim,fontSize:11}}>(${m.stage})</span>
-          </div>`;})}
+          <div style=${{maxHeight:200,overflowY:'auto'}}>
+            ${preview.map(function(m,i){
+              var valid=TEAMS.find(function(t){return t.name===m.team1;})&&TEAMS.find(function(t){return t.name===m.team2;});
+              return html`<div key=${i} style=${{fontFamily:F.cond,fontSize:12,color:valid?C.white:C.red,marginBottom:3,display:'flex',gap:8}}>
+                ${valid?'✓':'⚠'} ${m.team1} ${m.score1}–${m.score2} ${m.team2}
+                <span style=${{color:C.dim,fontSize:10}}>(${m.stage})</span>
+                ${!valid?html`<span style=${{color:C.red,fontSize:10}}>team name mismatch</span>`:''}
+              </div>`;
+            })}
+          </div>
           <div style=${{display:'flex',gap:8,marginTop:10}}>
             <button style=${S.btn('gold',{flex:1})} onClick=${applyPreview}>✓ Apply All</button>
-            <button style=${S.btn('ghost')} onClick=${function(){setPreview(null);}}>Discard</button>
+            <button style=${S.btn('ghost')} onClick=${function(){setPreview(null);setPasteText('');}}>Discard</button>
           </div>
         </div>`}
       </div>
@@ -1076,11 +1067,10 @@ function BonusQuestion(p){
 }
 
 function BonusPicksScreen(p){
-  // p.state, p.viewer, p.isC, p.onView, p.onBonusAdmin
   var bonusPicks=p.state.bonusPicks||{};
   var bonusAnswers=p.state.bonusAnswers||{};
   var bonusLocked=p.state.bonusLocked||{};
-  var myPicks=bonusPicks[p.viewer]||{};
+  var myPicks=(bonusPicks[p.viewer])||{};
   var _drafts=useState(function(){return Object.assign({},myPicks);}),drafts=_drafts[0],setDrafts=_drafts[1];
   var _saving=useState(''),saving=_saving[0],setSaving=_saving[1];
   var _open=useState('pre'),openPhase=_open[0],setOpenPhase=_open[1];
@@ -1088,12 +1078,14 @@ function BonusPicksScreen(p){
   function updateDraft(qid,val){setDrafts(function(d){var n=Object.assign({},d);n[qid]=val;return n;});}
 
   function submitPhase(phaseId){
+    if(!p.viewer){setSaving('⚠ Select your player name first');setTimeout(function(){setSaving('');},3000);return;}
     var phaseQids=BONUS_QUESTIONS.filter(function(q){return q.phase===phaseId;}).map(function(q){return q.id;});
+    var answered=phaseQids.filter(function(qid){return drafts[qid];}).length;
     var newPicks=Object.assign({},bonusPicks);
     newPicks[p.viewer]=Object.assign({},myPicks);
     phaseQids.forEach(function(qid){if(drafts[qid])newPicks[p.viewer][qid]=drafts[qid];});
     setSaving('Saving...');
-    p.onSave(newPicks,function(){setSaving('');});
+    p.onSave(newPicks,function(){setSaving('✓ Saved — '+answered+' of '+phaseQids.length+' questions answered');setTimeout(function(){setSaving('');},3000);});
   }
 
   // Bonus leaderboard (separate)
@@ -1107,6 +1099,16 @@ function BonusPicksScreen(p){
     <${TabBar} view="bonus" onSwitch=${p.onView}/>
 
     <div style=${{maxWidth:580,margin:'0 auto',padding:16}}>
+
+      ${p.isC&&html`<div style=${{...S.card({padding:'10px 14px',marginBottom:12}),border:'1px solid '+C.gold}}>
+        <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold,marginBottom:6}}>SUBMITTING PICKS AS</div>
+        <select value=${p.viewer||''} onChange=${function(e){p.onSetCommPlayer(e.target.value);}}
+          style=${{...S.inp,cursor:'pointer'}}>
+          <option value="">— Select your player name —</option>
+          ${p.state.players.map(function(pl){return html`<option key=${pl.name} value=${pl.name}>${pl.name}</option>`;}) }
+        </select>
+        ${!p.viewer&&html`<div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:4}}>Select your name to submit picks. You can still admin bonus picks without selecting.</div>`}
+      </div>`}
 
       <!-- Bonus leaderboard -->
       <div style=${S.card({marginBottom:16,padding:'12px 14px'})}>
@@ -1166,12 +1168,12 @@ function BonusPicksScreen(p){
               </div>`;
             })}
             ${!locked&&html`<div>
-              ${saving&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.gold,marginBottom:8}}>${saving}</div>`}
+              ${saving&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:saving.startsWith('✓')?C.grass:saving.startsWith('⚠')?C.red:C.gold,marginBottom:8,textAlign:'center'}}>${saving}</div>`}
               <button style=${{...S.btn('gold'),width:'100%'}} onClick=${function(){submitPhase(ph.id);}}>
                 ✓ Save My Picks
               </button>
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:6,textAlign:'center'}}>
-                Picks are hidden from other players until the phase locks
+                You don't need to answer every question — save partial picks and come back any time before the deadline. Picks are hidden from other players until the phase locks.
               </div>
             </div>`}
             ${locked&&!bonusAnswers[phaseQs[0].id]&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,textAlign:'center',padding:'8px 0'}}>
@@ -1190,6 +1192,50 @@ function BonusAdminScreen(p){
   var bonusPicks=p.state.bonusPicks||{};
   var _localAnswers=useState(Object.assign({},bonusAnswers)),localAnswers=_localAnswers[0],setLocalAnswers=_localAnswers[1];
   var _saving=useState(false),saving=_saving[0],setSaving=_saving[1];
+  var _paste=useState(''),paste=_paste[0],setPaste=_paste[1];
+  var _pasteErr=useState(''),pasteErr=_pasteErr[0],setPasteErr=_pasteErr[1];
+  var _pastePhase=useState(''),pastePhase=_pastePhase[0],setPastePhase=_pastePhase[1];
+
+  function buildAdminPrompt(phaseId){
+    var phaseQs=BONUS_QUESTIONS.filter(function(q){return q.phase===phaseId;});
+    var teamNames=TEAMS.map(function(t){return t.name;}).join(', ');
+    var playerNames=BONUS_PLAYERS.filter(function(pl){return pl!=='— Other (type below) —';}).join(', ');
+    var lines=['Search the web for current FIFA World Cup 2026 results and answer these questions.'];
+    lines.push('Return ONLY a JSON object with no markdown or explanation:');
+    lines.push('{');
+    phaseQs.forEach(function(q,i){
+      var hint='';
+      if(q.type==='team') hint=' // Use exactly one of: '+teamNames;
+      else if(q.type==='player') hint=' // Use exactly one of: '+playerNames;
+      else if(q.type==='yesno') hint=' // Answer exactly "Yes" or "No"';
+      else if(q.type==='select') hint=' // Choose from: '+q.opts.join(', ');
+      lines.push('  "'+q.id+'": "answer"'+(i<phaseQs.length-1?',':'')+'  // '+q.text+hint);
+    });
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  function openClaude(phaseId){
+    var prompt=buildAdminPrompt(phaseId);
+    navigator.clipboard.writeText(prompt).catch(function(){});
+    window.open('https://claude.ai/new','_blank');
+    setPastePhase(phaseId);
+    setPaste('');setPasteErr('');
+  }
+
+  function applyPaste(){
+    try{
+      var jm=paste.match(/\{[\s\S]*\}/);
+      if(!jm){setPasteErr('Could not find JSON — copy the full {...} block');return;}
+      var obj=JSON.parse(jm[0]);
+      setLocalAnswers(function(a){
+        var n=Object.assign({},a);
+        Object.keys(obj).forEach(function(k){if(obj[k])n[k]=String(obj[k]);});
+        return n;
+      });
+      setPaste('');setPastePhase('');setPasteErr('');
+    }catch(e){setPasteErr('Parse error: '+e.message);}
+  }
 
   function toggleLock(phaseId){
     var newLocked=Object.assign({},bonusLocked);
@@ -1234,7 +1280,28 @@ function BonusAdminScreen(p){
           </div>
 
           ${locked&&html`<div style=${{borderTop:'1px solid '+C.faint,paddingTop:12}}>
-            <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold,marginBottom:10}}>CORRECT ANSWERS</div>
+            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold}}>CORRECT ANSWERS</div>
+              <button style=${S.btn('ghost',{fontSize:11,padding:'4px 10px'})}
+                onClick=${function(){openClaude(ph.id);}}>
+                🤖 Look Up via Claude.ai
+              </button>
+            </div>
+            ${pastePhase===ph.id&&html`<div style=${{...S.card({padding:'10px 12px',marginBottom:12}),border:'1px solid rgba(245,197,24,0.3)'}}>
+              <div style=${{fontFamily:F.body,fontSize:12,color:C.dim,marginBottom:6}}>
+                Claude.ai opened with the scoring prompt. Paste the JSON response here to auto-fill all answers:
+              </div>
+              <textarea
+                style=${{...S.inp,height:60,resize:'vertical',fontFamily:'monospace',fontSize:10,marginBottom:6}}
+                placeholder='{"q-champion":"France","q-golden-boot":"Kylian Mbappé (France)",...}'
+                value=${paste}
+                onInput=${function(e){setPaste(e.target.value);setPasteErr('');}}/>
+              ${pasteErr&&html`<div style=${{color:C.red,fontSize:11,marginBottom:6}}>${pasteErr}</div>`}
+              <div style=${{display:'flex',gap:6}}>
+                <button style=${S.btn('gold',{flex:1,fontSize:12,padding:'6px'})} onClick=${applyPaste}>✓ Fill Answers</button>
+                <button style=${S.btn('ghost',{fontSize:12,padding:'6px'})} onClick=${function(){setPastePhase('');setPaste('');setPasteErr('');}}>Cancel</button>
+              </div>
+            </div>`}
             ${phaseQs.map(function(q){
               return html`<div key=${q.id} style=${{marginBottom:10}}>
                 <label style=${S.lbl}>${q.text} <span style=${{color:C.gold}}>(${q.pts}pts)</span></label>
@@ -1366,6 +1433,7 @@ function App(p){
   var _5=useState(false),managing=_5[0],setManaging=_5[1];
   var _6=useState('standings'),view=_6[0],setView=_6[1];
   var _7=useState(false),bonusAdmin=_7[0],setBonusAdmin=_7[1];
+  var _8=useState(localStorage.getItem('wc26-commplayer')||''),commPlayer=_8[0],setCommPlayer=_8[1];
 
   function persist(ns){
     setState(ns);
@@ -1440,9 +1508,11 @@ function App(p){
         onSave=${function(locked,answers){persist(Object.assign({},state,{bonusLocked:locked,bonusAnswers:answers}));}}/>`;
     }
     if(view==='bonus'){
-      return html`<${BonusPicksScreen} state=${state} viewer=${viewer} isC=${isC}
+      var effectiveViewer=isC?commPlayer:viewer;
+      return html`<${BonusPicksScreen} state=${state} viewer=${effectiveViewer} isC=${isC}
         onView=${setView}
         onBonusAdmin=${function(){setBonusAdmin(true);}}
+        onSetCommPlayer=${function(n){setCommPlayer(n);localStorage.setItem('wc26-commplayer',n);}}
         onSave=${function(newPicks,cb){persist(Object.assign({},state,{bonusPicks:newPicks}));if(cb)cb();}}/>`;
     }
     return html`<${Leaderboard} state=${state} isC=${isC} viewer=${viewer}
