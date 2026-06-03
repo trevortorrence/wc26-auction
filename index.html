@@ -83,7 +83,7 @@ const TEAMS=[
 const PNAMES=["Trevor","Allison","Glen","Willow","Mike","Katie","Josie","Abby","Ron","Sarah","Adam","Charlie","Nora"];
 const BUDGET=100,TPP=3,TOTAL=PNAMES.length*TPP;
 const NOM=[...Array.from({length:13},(_,i)=>i),...Array.from({length:13},(_,i)=>12-i),...Array.from({length:13},(_,i)=>i)];
-const INIT={phase:'setup',pin:'',players:PNAMES.map(n=>({name:n,budget:BUDGET,teams:[]})),currentLot:null,nomIndex:0,soldTeams:{}};
+const INIT={phase:'setup',pin:'',players:PNAMES.map(n=>({name:n,budget:BUDGET,teams:[]})),currentLot:null,nomIndex:0,soldTeams:{},matches:[],bonusPicks:{},bonusAnswers:{},bonusLocked:{}};
 
 const shuffle=pl=>{
   const a=[...pl];
@@ -109,6 +109,10 @@ function loadFB(){
           d.players=d.players.map(function(p){return Object.assign({teams:[]},p);});
           d.soldTeams=d.soldTeams||{};
           d.currentLot=d.currentLot||null;
+          d.matches=d.matches||[];
+          d.bonusPicks=d.bonusPicks||{};
+          d.bonusAnswers=d.bonusAnswers||{};
+          d.bonusLocked=d.bonusLocked||{};
           resolve(d);
         }else{console.warn('Bad state shape');resolve(null);}
       }catch(e){console.error('Parse error',e);resolve(null);}
@@ -156,6 +160,95 @@ var STAGES=[
   {id:'final',label:'Final'}
 ];
 var STAGE_PTS={group:2,r32:4,r16:8,qf:15,sf:25,final:35};
+
+// ── Phase 4: Bonus Picks ──────────────────────────────────────────────────────
+var BONUS_PHASES=[
+  {id:'pre',   label:'Pre-Tournament',  hint:'Lock before June 11 kickoff'},
+  {id:'r32',   label:'Round of 32',     hint:'Lock before R32 begins'},
+  {id:'qf',    label:'Quarterfinals',   hint:'Lock before QF begins'},
+  {id:'sf',    label:'Semifinals',      hint:'Lock before SF begins'},
+  {id:'final', label:'The Final',       hint:'Lock before the Final'},
+];
+
+var BONUS_QUESTIONS=[
+  // Pre-Tournament — The Big Calls
+  {id:'q-champion',   phase:'pre', cat:'The Big Calls',   pts:8,  type:'team',
+    text:'Who wins the World Cup?', hint:'France and Argentina are the current favourites'},
+  {id:'q-finalist',   phase:'pre', cat:'The Big Calls',   pts:6,  type:'team',
+    text:'Who reaches the Final but loses?', hint:'Runner-up still earns big main-game points'},
+  {id:'q-sf-dark',    phase:'pre', cat:'The Big Calls',   pts:8,  type:'team',
+    text:'Which team outside the top 15 reaches the Semifinals?', hint:'Morocco made it in 2022 — Scotland? USA?'},
+  {id:'q-goals-grp',  phase:'pre', cat:'The Big Calls',   pts:5,  type:'select',
+    opts:['Group A','Group B','Group C','Group D','Group E','Group F','Group G','Group H','Group I','Group J','Group K','Group L'],
+    text:'Which group has the most total goals?', hint:'Group E has Germany and Ecuador — historically high scorers'},
+  // Pre-Tournament — Stars & Scoring
+  {id:'q-golden-boot',phase:'pre', cat:'Stars & Scoring', pts:10, type:'player',
+    text:'Who wins the Golden Boot (top scorer)?', hint:'Mbappé, Haaland, Messi, and Kane are always in contention'},
+  {id:'q-first-goal', phase:'pre', cat:'Stars & Scoring', pts:8,  type:'player',
+    text:"Who scores the tournament's first goal?", hint:'Group I opens: France vs Senegal'},
+  // Pre-Tournament — USMNT Watch
+  {id:'q-usa-advance',phase:'pre', cat:'USMNT Watch',     pts:3,  type:'yesno',
+    text:'Does the USA advance from Group D?', hint:'Group D: USA, Türkiye, Australia, Paraguay'},
+  {id:'q-usa-goal',   phase:'pre', cat:'USMNT Watch',     pts:6,  type:'player',
+    text:"Who scores the USA's first goal?", hint:'Pulisic, Balogun, and Weah are the frontrunners'},
+  {id:'q-usa-stage',  phase:'pre', cat:'USMNT Watch',     pts:6,  type:'select',
+    opts:['Group Stage','Round of 32','Round of 16','Quarterfinal','Semifinal','Final'],
+    text:'How far does the USA go?', hint:"They're hosting — home crowd advantage is real"},
+  {id:'q-scotland',   phase:'pre', cat:'USMNT Watch',     pts:3,  type:'yesno',
+    text:'Does Scotland advance from Group C?', hint:'Group C: Brazil, Morocco, Scotland, Haiti'},
+  // Round of 32
+  {id:'q-r32-upset',  phase:'r32', cat:'Knockout Picks',  pts:8,  type:'team',
+    text:'Name a team ranked outside the top 20 who wins in R32', hint:'Curaçao, Haiti, Cabo Verde, Jordan...'},
+  {id:'q-r32-blow',   phase:'r32', cat:'Knockout Picks',  pts:4,  type:'yesno',
+    text:'Will any R32 match be decided by 4+ goals?', hint:'Top seeds can dismantle weaker teams badly'},
+  // Quarterfinals
+  {id:'q-qf-pens',    phase:'qf',  cat:'Knockout Picks',  pts:6,  type:'yesno',
+    text:'Does any Quarterfinal go to penalties?', hint:'Usually at least one QF does'},
+  {id:'q-qf-surprise',phase:'qf',  cat:'Knockout Picks',  pts:8,  type:'team',
+    text:'Which QF produces the biggest upset? (pick the lower-ranked winner)', hint:'The team you think wins despite being the underdog'},
+  // Semifinals
+  {id:'q-sf-a',       phase:'sf',  cat:'The Final Four',  pts:6,  type:'team',
+    text:'Name one finalist', hint:'Which team makes the Final?'},
+  {id:'q-sf-b',       phase:'sf',  cat:'The Final Four',  pts:6,  type:'team',
+    text:'Name the other finalist', hint:'The second team in the Final'},
+  // The Final
+  {id:'q-final-score',phase:'final',cat:'The Final',      pts:12, type:'text',
+    text:'Predict the exact final score (e.g. France 2-1 Spain)', hint:'Most WC Finals are won by a single goal'},
+  {id:'q-final-first',phase:'final',cat:'The Final',      pts:8,  type:'player',
+    text:'Who scores first in the Final?', hint:'The first scorer wins the Final ~60% of the time'},
+  {id:'q-final-extra',phase:'final',cat:'The Final',      pts:4,  type:'yesno',
+    text:'Does the Final go to extra time?', hint:'4 of the last 8 WC Finals went to extra time'},
+  {id:'q-tournament-player',phase:'final',cat:'The Final',pts:8,  type:'player',
+    text:'Who wins Player of the Tournament?', hint:'Usually the star of the winning team'},
+];
+
+var BONUS_PLAYERS=[
+  'Kylian Mbappé (France)','Erling Haaland (Norway)','Vinicius Jr. (Brazil)',
+  'Lionel Messi (Argentina)','Cristiano Ronaldo (Portugal)','Harry Kane (England)',
+  'Jude Bellingham (England)','Bukayo Saka (England)','Lamine Yamal (Spain)',
+  'Pedri (Spain)','Álvaro Morata (Spain)','Julián Álvarez (Argentina)',
+  'Lautaro Martínez (Argentina)','Jamal Musiala (Germany)','Florian Wirtz (Germany)',
+  'Cody Gakpo (Netherlands)','Xavi Simons (Netherlands)','Rafael Leão (Portugal)',
+  'Bruno Fernandes (Portugal)','Antoine Griezmann (France)','Ousmane Dembélé (France)',
+  'Darwin Núñez (Uruguay)','Federico Valverde (Uruguay)','Luis Díaz (Colombia)',
+  'Richarlison (Brazil)','Kaoru Mitoma (Japan)','Son Heung-min (South Korea)',
+  'Sadio Mané (Senegal)','Mo Salah (Egypt)','Christian Pulisic (USA)',
+  'Folarin Balogun (USA)','Timothy Weah (USA)','Martin Ødegaard (Norway)',
+  'Kevin De Bruyne (Belgium)','Romelu Lukaku (Belgium)',
+  '— Other (type below) —'
+];
+
+function calcBonusPts(playerName,bonusPicks,bonusAnswers){
+  var picks=(bonusPicks||{})[playerName]||{};
+  var total=0;
+  for(var i=0;i<BONUS_QUESTIONS.length;i++){
+    var q=BONUS_QUESTIONS[i];
+    var ans=(picks[q.id]||'').toLowerCase().trim();
+    var correct=((bonusAnswers||{})[q.id]||'').toLowerCase().trim();
+    if(ans&&correct&&ans===correct) total+=q.pts;
+  }
+  return total;
+}
 
 function calcPts(players,matches){
   var pts={};
@@ -585,6 +678,7 @@ function Leaderboard(p){
     ${modal&&html`<${TeamModal} team=${modal.team} owner=${modal.owner} matches=${matches} onClose=${function(){setModal(null);}}/>`}
     <${Hdr} sub="TOURNAMENT LEADERBOARD"
       right=${html`<button onClick=${doRefresh} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
+    <${TabBar} view="standings" onSwitch=${p.onSwitchView}/>
     <div style=${{maxWidth:600,margin:'0 auto',padding:16}}>
       ${p.isC&&html`<div style=${{display:'flex',gap:8,marginBottom:16}}>
         <button style=${{...S.btn('gold'),flex:1}} onClick=${p.onManage}>📋 Update Results</button>
@@ -893,6 +987,291 @@ function ResultsView(p){
   </div>`;
 }
 
+// ── Phase 4 Components ────────────────────────────────────────────────────────
+
+function TabBar(p){
+  return html`<div style=${{display:'flex',background:C.deep,borderBottom:'1px solid '+C.faint}}>
+    ${['standings','bonus'].map(function(v){
+      var label=v==='standings'?'🏆 Standings':'⭐ Bonus Picks';
+      var active=p.view===v;
+      return html`<button key=${v} onClick=${function(){p.onSwitch(v);}}
+        style=${{flex:1,border:'none',borderBottom:'3px solid '+(active?C.gold:'transparent'),
+          background:'transparent',color:active?C.gold:C.dim,fontFamily:F.cond,fontWeight:700,
+          fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase',padding:'12px',cursor:'pointer'}}>
+        ${label}
+      </button>`;
+    })}
+  </div>`;
+}
+
+function BonusQuestion(p){
+  // p.q, p.answer, p.correctAnswer, p.locked, p.onChange, p.readOnly
+  var q=p.q;
+  var locked=p.locked;
+  var answered=p.answer&&p.answer.length>0;
+  var isCorrect=locked&&p.correctAnswer&&(p.answer||'').toLowerCase().trim()===(p.correctAnswer||'').toLowerCase().trim();
+  var isWrong=locked&&p.correctAnswer&&answered&&!isCorrect;
+  var _ot=useState(false),showOther=_ot[0],setShowOther=_ot[1];
+
+  var inputStyle={...S.inp,opacity:p.readOnly?0.6:1};
+  var sel={...inputStyle,cursor:'pointer'};
+
+  function handleChange(val){
+    if(val==='— Other (type below) —'){setShowOther(true);p.onChange('');}
+    else{setShowOther(false);p.onChange(val);}
+  }
+
+  return html`<div style=${{marginBottom:16,paddingBottom:16,borderBottom:'1px solid '+C.faint}}>
+    <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+      <div style=${{fontFamily:F.cond,fontSize:13,fontWeight:700,color:C.white,flex:1,paddingRight:8}}>${q.text}</div>
+      <div style=${{fontFamily:F.display,fontSize:16,color:C.gold,flexShrink:0}}>${q.pts}pts</div>
+    </div>
+    <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginBottom:8}}>${q.hint}</div>
+
+    ${q.type==='yesno'&&html`<div style=${{display:'flex',gap:8}}>
+      ${['Yes','No'].map(function(opt){
+        var selected=p.answer===opt;
+        return html`<button key=${opt} disabled=${p.readOnly} onClick=${function(){p.onChange(opt);}}
+          style=${{...S.btn(selected?'gold':'ghost',{flex:1,fontSize:13,padding:'8px'}),opacity:p.readOnly?0.7:1}}>
+          ${opt}
+        </button>`;
+      })}
+    </div>`}
+
+    ${q.type==='team'&&html`<select value=${p.answer||''} disabled=${p.readOnly}
+      onChange=${function(e){p.onChange(e.target.value);}} style=${sel}>
+      <option value="">Select a team...</option>
+      ${TEAMS.map(function(t){return html`<option key=${t.name} value=${t.name}>${t.flag||''} ${t.name}</option>`;}) }
+    </select>`}
+
+    ${q.type==='player'&&html`<div>
+      <select value=${BONUS_PLAYERS.indexOf(p.answer)>=0?p.answer:(p.answer?'— Other (type below) —':'')}
+        disabled=${p.readOnly}
+        onChange=${function(e){handleChange(e.target.value);}} style=${{...sel,marginBottom:showOther?8:0}}>
+        <option value="">Select a player...</option>
+        ${BONUS_PLAYERS.map(function(pl){return html`<option key=${pl} value=${pl}>${pl}</option>`;}) }
+      </select>
+      ${(showOther||(p.answer&&BONUS_PLAYERS.indexOf(p.answer)<0&&p.answer!==''))&&html`<input style=${inputStyle}
+        placeholder="Type player name..." value=${p.answer||''}
+        disabled=${p.readOnly}
+        onInput=${function(e){p.onChange(e.target.value);}}/>`}
+    </div>`}
+
+    ${q.type==='select'&&html`<select value=${p.answer||''} disabled=${p.readOnly}
+      onChange=${function(e){p.onChange(e.target.value);}} style=${sel}>
+      <option value="">Select...</option>
+      ${(q.opts||[]).map(function(o){return html`<option key=${o} value=${o}>${o}</option>`;}) }
+    </select>`}
+
+    ${q.type==='text'&&html`<input style=${inputStyle} placeholder="Type your answer..."
+      value=${p.answer||''} disabled=${p.readOnly}
+      onInput=${function(e){p.onChange(e.target.value);}}/>`}
+
+    ${locked&&p.correctAnswer&&html`<div style=${{marginTop:8,display:'flex',alignItems:'center',gap:8}}>
+      <div style=${{fontFamily:F.cond,fontSize:11,color:isCorrect?C.grass:isWrong?C.red:C.dim,fontWeight:700}}>
+        ${isCorrect?'✓ Correct +'+q.pts+' pts':isWrong?'✗ Wrong — correct: '+p.correctAnswer:'Answer: '+p.correctAnswer}
+      </div>
+    </div>`}
+  </div>`;
+}
+
+function BonusPicksScreen(p){
+  // p.state, p.viewer, p.isC, p.onView, p.onBonusAdmin
+  var bonusPicks=p.state.bonusPicks||{};
+  var bonusAnswers=p.state.bonusAnswers||{};
+  var bonusLocked=p.state.bonusLocked||{};
+  var myPicks=bonusPicks[p.viewer]||{};
+  var _drafts=useState(function(){return Object.assign({},myPicks);}),drafts=_drafts[0],setDrafts=_drafts[1];
+  var _saving=useState(''),saving=_saving[0],setSaving=_saving[1];
+  var _open=useState('pre'),openPhase=_open[0],setOpenPhase=_open[1];
+
+  function updateDraft(qid,val){setDrafts(function(d){var n=Object.assign({},d);n[qid]=val;return n;});}
+
+  function submitPhase(phaseId){
+    var phaseQids=BONUS_QUESTIONS.filter(function(q){return q.phase===phaseId;}).map(function(q){return q.id;});
+    var newPicks=Object.assign({},bonusPicks);
+    newPicks[p.viewer]=Object.assign({},myPicks);
+    phaseQids.forEach(function(qid){if(drafts[qid])newPicks[p.viewer][qid]=drafts[qid];});
+    setSaving('Saving...');
+    p.onSave(newPicks,function(){setSaving('');});
+  }
+
+  // Bonus leaderboard (separate)
+  var bonusRanked=[].concat(p.state.players).map(function(pl){
+    return {name:pl.name,pts:calcBonusPts(pl.name,bonusPicks,bonusAnswers)};
+  }).sort(function(a,b){return b.pts-a.pts;});
+
+  return html`<div style=${S.page}>
+    <${Hdr} sub="BONUS PICKS"
+      right=${p.isC?html`<button onClick=${p.onBonusAdmin} style=${S.btn('ghost',{fontSize:11,padding:'5px 10px'})}>⚙ Admin</button>`:null}/>
+    <${TabBar} view="bonus" onSwitch=${p.onView}/>
+
+    <div style=${{maxWidth:580,margin:'0 auto',padding:16}}>
+
+      <!-- Bonus leaderboard -->
+      <div style=${S.card({marginBottom:16,padding:'12px 14px'})}>
+        <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold,marginBottom:10}}>BONUS LEADERBOARD</div>
+        ${bonusRanked.map(function(r,i){
+          var isSelf=r.name===p.viewer;
+          return html`<div key=${r.name} style=${{display:'flex',alignItems:'center',gap:10,padding:'5px 0',
+            borderBottom:'1px solid '+C.faint}}>
+            <div style=${{fontFamily:F.display,fontSize:18,color:C.dim,width:20,textAlign:'center'}}>${i+1}</div>
+            <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,flex:1,color:isSelf?C.gold:C.white}}>
+              ${isSelf?'▶ ':''} ${r.name}${isSelf?' (you)':''}
+            </div>
+            <div style=${{fontFamily:F.display,fontSize:20,color:r.pts>0?C.gold:C.dim}}>${r.pts}</div>
+          </div>`;
+        })}
+        <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:8}}>
+          Scored separately from main standings. Max possible: 133 pts.
+        </div>
+      </div>
+
+      <!-- Phase sections -->
+      ${BONUS_PHASES.map(function(ph){
+        var phaseQs=BONUS_QUESTIONS.filter(function(q){return q.phase===ph.id;});
+        var locked=!!bonusLocked[ph.id];
+        var submitted=phaseQs.filter(function(q){return myPicks[q.id];}).length;
+        var isOpen=openPhase===ph.id;
+        var cats=[...new Set(phaseQs.map(function(q){return q.cat;}))];
+
+        return html`<div key=${ph.id} style=${{...S.card({padding:0}),marginBottom:10,overflow:'hidden',border:'1px solid '+(locked?C.faint:C.gold)}}>
+          <!-- Phase header -->
+          <div onClick=${function(){setOpenPhase(isOpen?null:ph.id);}}
+            style=${{display:'flex',alignItems:'center',justifyContent:'space-between',
+              padding:'12px 16px',cursor:'pointer',
+              background:locked?C.deep:'transparent'}}>
+            <div>
+              <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:15,color:locked?C.dim:C.white}}>${ph.label}</div>
+              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:2}}>
+                ${locked?'🔒 Locked':('Open · '+ph.hint)}
+                ${!locked&&submitted>0?html`<span style=${{color:C.gold,marginLeft:8}}>${submitted}/${phaseQs.length} submitted</span>`:''}
+              </div>
+            </div>
+            <span style=${{color:C.gold}}>${isOpen?'▲':'▼'}</span>
+          </div>
+
+          ${isOpen&&html`<div style=${{padding:'0 16px 16px',borderTop:'1px solid '+C.faint}}>
+            ${cats.map(function(cat){
+              var catQs=phaseQs.filter(function(q){return q.cat===cat;});
+              return html`<div key=${cat} style=${{marginTop:14}}>
+                <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold,marginBottom:12}}>${cat}</div>
+                ${catQs.map(function(q){
+                  return html`<${BonusQuestion} key=${q.id} q=${q}
+                    answer=${locked?myPicks[q.id]:drafts[q.id]}
+                    correctAnswer=${bonusAnswers[q.id]}
+                    locked=${locked}
+                    readOnly=${locked}
+                    onChange=${function(val){updateDraft(q.id,val);}}/>`;})}
+              </div>`;
+            })}
+            ${!locked&&html`<div>
+              ${saving&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.gold,marginBottom:8}}>${saving}</div>`}
+              <button style=${{...S.btn('gold'),width:'100%'}} onClick=${function(){submitPhase(ph.id);}}>
+                ✓ Save My Picks
+              </button>
+              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:6,textAlign:'center'}}>
+                Picks are hidden from other players until the phase locks
+              </div>
+            </div>`}
+            ${locked&&!bonusAnswers[phaseQs[0].id]&&html`<div style=${{fontFamily:F.cond,fontSize:12,color:C.dim,textAlign:'center',padding:'8px 0'}}>
+              Awaiting correct answers from commissioner
+            </div>`}
+          </div>`}
+        </div>`;
+      })}
+    </div>
+  </div>`;
+}
+
+function BonusAdminScreen(p){
+  var bonusLocked=p.state.bonusLocked||{};
+  var bonusAnswers=p.state.bonusAnswers||{};
+  var bonusPicks=p.state.bonusPicks||{};
+  var _localAnswers=useState(Object.assign({},bonusAnswers)),localAnswers=_localAnswers[0],setLocalAnswers=_localAnswers[1];
+  var _saving=useState(false),saving=_saving[0],setSaving=_saving[1];
+
+  function toggleLock(phaseId){
+    var newLocked=Object.assign({},bonusLocked);
+    newLocked[phaseId]=!newLocked[phaseId];
+    p.onSave(newLocked,bonusAnswers);
+  }
+
+  function saveAnswers(){
+    setSaving(true);
+    p.onSave(bonusLocked,localAnswers);
+    setTimeout(function(){setSaving(false);},800);
+  }
+
+  return html`<div style=${S.page}>
+    <${Hdr} sub="BONUS PICKS ADMIN"
+      right=${html`<button onClick=${p.onBack} style=${S.btn('ghost',{fontSize:12,padding:'6px 14px'})}>← Back</button>`}/>
+    <div style=${{maxWidth:580,margin:'0 auto',padding:16}}>
+      <div style=${{fontFamily:F.body,fontSize:13,color:C.dim,marginBottom:16,lineHeight:1.5}}>
+        Lock each phase before it starts. Enter correct answers after each round completes — points calculate automatically.
+      </div>
+
+      ${BONUS_PHASES.map(function(ph){
+        var locked=!!bonusLocked[ph.id];
+        var phaseQs=BONUS_QUESTIONS.filter(function(q){return q.phase===ph.id;});
+        var submissions=p.state.players.filter(function(pl){
+          var picks=bonusPicks[pl.name]||{};
+          return phaseQs.some(function(q){return picks[q.id];});
+        }).length;
+
+        return html`<div key=${ph.id} style=${{...S.card({padding:'14px 16px',marginBottom:10}),border:'1px solid '+(locked?C.faint:C.gold)}}>
+          <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div>
+              <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:15,color:locked?C.dim:C.white}}>${ph.label}</div>
+              <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:2}}>
+                ${submissions} of ${p.state.players.length} players submitted picks
+              </div>
+            </div>
+            <button onClick=${function(){toggleLock(ph.id);}}
+              style=${S.btn(locked?'ghost':'gold',{fontSize:12,padding:'6px 14px'})}>
+              ${locked?'🔓 Unlock':'🔒 Lock Phase'}
+            </button>
+          </div>
+
+          ${locked&&html`<div style=${{borderTop:'1px solid '+C.faint,paddingTop:12}}>
+            <div style=${{fontFamily:F.cond,fontSize:11,letterSpacing:'0.1em',color:C.gold,marginBottom:10}}>CORRECT ANSWERS</div>
+            ${phaseQs.map(function(q){
+              return html`<div key=${q.id} style=${{marginBottom:10}}>
+                <label style=${S.lbl}>${q.text} <span style=${{color:C.gold}}>(${q.pts}pts)</span></label>
+                ${q.type==='yesno'?html`<div style=${{display:'flex',gap:8}}>
+                  ${['Yes','No'].map(function(opt){
+                    var sel=(localAnswers[q.id]||'')=== opt;
+                    return html`<button key=${opt} onClick=${function(){setLocalAnswers(function(a){var n=Object.assign({},a);n[q.id]=opt;return n;});}}
+                      style=${S.btn(sel?'gold':'ghost',{flex:1,fontSize:12,padding:'6px'})}>
+                      ${opt}
+                    </button>`;
+                  })}
+                </div>`:q.type==='team'?html`<select value=${localAnswers[q.id]||''}
+                  onChange=${function(e){setLocalAnswers(function(a){var n=Object.assign({},a);n[q.id]=e.target.value;return n;});}}
+                  style=${{...S.inp,cursor:'pointer'}}>
+                  <option value="">Select correct team...</option>
+                  ${TEAMS.map(function(t){return html`<option key=${t.name} value=${t.name}>${t.name}</option>`;}) }
+                </select>`:q.type==='select'?html`<select value=${localAnswers[q.id]||''}
+                  onChange=${function(e){setLocalAnswers(function(a){var n=Object.assign({},a);n[q.id]=e.target.value;return n;});}}
+                  style=${{...S.inp,cursor:'pointer'}}>
+                  <option value="">Select answer...</option>
+                  ${(q.opts||[]).map(function(o){return html`<option key=${o} value=${o}>${o}</option>`;}) }
+                </select>`:html`<input style=${S.inp} value=${localAnswers[q.id]||''}
+                  placeholder="Enter correct answer (case-insensitive match)..."
+                  onInput=${function(e){setLocalAnswers(function(a){var n=Object.assign({},a);n[q.id]=e.target.value;return n;});}}/>`}
+              </div>`;
+            })}
+            <button style=${{...S.btn('gold'),width:'100%',opacity:saving?0.6:1}}
+              onClick=${saveAnswers} disabled=${saving}>
+              ${saving?'Saving...':'✓ Save Answers'}
+            </button>
+          </div>`}
+        </div>`;
+      })}
+    </div>
+  </div>`;
+}
+
 function CommView(p){
   var _=useState(false),rst=_[0],setRst=_[1];
   var nom=nomN(p.state.players,p.state.nomIndex);
@@ -985,6 +1364,8 @@ function App(p){
 
   var ____=useState(''),saveMsg=____[0],setSaveMsg=____[1];
   var _5=useState(false),managing=_5[0],setManaging=_5[1];
+  var _6=useState('standings'),view=_6[0],setView=_6[1];
+  var _7=useState(false),bonusAdmin=_7[0],setBonusAdmin=_7[1];
 
   function persist(ns){
     setState(ns);
@@ -1053,7 +1434,19 @@ function App(p){
         onBack=${function(){setManaging(false);}}
         onSave=${function(matches){persist(Object.assign({},state,{matches:matches}));setManaging(false);}}/>`;
     }
+    if(isC&&bonusAdmin){
+      return html`<${BonusAdminScreen} state=${state}
+        onBack=${function(){setBonusAdmin(false);}}
+        onSave=${function(locked,answers){persist(Object.assign({},state,{bonusLocked:locked,bonusAnswers:answers}));}}/>`;
+    }
+    if(view==='bonus'){
+      return html`<${BonusPicksScreen} state=${state} viewer=${viewer} isC=${isC}
+        onView=${setView}
+        onBonusAdmin=${function(){setBonusAdmin(true);}}
+        onSave=${function(newPicks,cb){persist(Object.assign({},state,{bonusPicks:newPicks}));if(cb)cb();}}/>`;
+    }
     return html`<${Leaderboard} state=${state} isC=${isC} viewer=${viewer}
+      view=${view} onSwitchView=${setView}
       onManage=${function(){setManaging(true);}}
       onRef=${refresh}/>`;
   }
