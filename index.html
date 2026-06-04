@@ -3,7 +3,21 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="WC26"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <title>WC26 Auction Draft</title>
+  <script>
+    (function(){try{
+      var c=document.createElement('canvas');c.width=180;c.height=180;
+      var x=c.getContext('2d');
+      x.fillStyle='#0A1628';x.fillRect(0,0,180,180);
+      x.font='110px serif';x.textAlign='center';x.textBaseline='middle';
+      x.fillText('\uD83C\uDFC6',90,95);
+      var l=document.createElement('link');l.rel='apple-touch-icon';l.href=c.toDataURL('image/png');
+      document.head.appendChild(l);
+    }catch(e){}}());
+  </script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css"/>
   <style>
@@ -702,7 +716,7 @@ function Leaderboard(p){
             <div style=${{flex:1}}>
               <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                 <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:18,color:isSelf?C.gold:C.white}}>
-                  ${isSelf?html`<span style=${{color:C.gold,marginRight:4}}>▶</span>`:''}${pl.name}
+                  ${isSelf?html`<span style=${{color:C.gold,marginRight:4}}> ★</span>`:''}${pl.name}
                   ${isSelf?html`<span style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6,fontWeight:400}}>(you)</span>`:''}
                 </div>
                 <div style=${{fontFamily:F.display,fontSize:30,color:score>0?C.gold:C.dim}}>${score}</div>
@@ -1119,7 +1133,7 @@ function BonusPicksScreen(p){
             borderBottom:'1px solid '+C.faint}}>
             <div style=${{fontFamily:F.display,fontSize:18,color:C.dim,width:20,textAlign:'center'}}>${i+1}</div>
             <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:14,flex:1,color:isSelf?C.gold:C.white}}>
-              ${isSelf?'▶ ':''} ${r.name}${isSelf?' (you)':''}
+              ${isSelf?'★ ':''} ${r.name}${isSelf?' (you)':''}
             </div>
             <div style=${{fontFamily:F.display,fontSize:20,color:r.pts>0?C.gold:C.dim}}>${r.pts}</div>
           </div>`;
