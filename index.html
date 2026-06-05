@@ -177,12 +177,42 @@ var STAGE_PTS={group:2,r32:4,r16:8,qf:15,sf:25,final:35};
 
 // ── Phase 4: Bonus Picks ──────────────────────────────────────────────────────
 var BONUS_PHASES=[
-  {id:'pre',   label:'Pre-Tournament',  hint:'Lock before June 11 kickoff'},
-  {id:'r32',   label:'Round of 32',     hint:'Lock before R32 begins'},
-  {id:'qf',    label:'Quarterfinals',   hint:'Lock before QF begins'},
-  {id:'sf',    label:'Semifinals',      hint:'Lock before SF begins'},
-  {id:'final', label:'The Final',       hint:'Lock before the Final'},
+  {id:'pre',   label:'Pre-Tournament', deadline:'2026-06-11T14:00:00-04:00', hint:'Locks June 11 before opening match · Mexico vs South Africa 3:00 PM ET'},
+  {id:'r32',   label:'Round of 32',    deadline:'2026-06-27T23:59:00-04:00', hint:'Locks June 27 midnight · R32 starts June 28'},
+  {id:'qf',    label:'Quarterfinals',  deadline:'2026-07-09T23:59:00-04:00', hint:'Locks July 9 midnight · QF starts July 10'},
+  {id:'sf',    label:'Semifinals',     deadline:'2026-07-13T23:59:00-04:00', hint:'Locks July 13 midnight · SF starts July 14'},
+  {id:'final', label:'The Final',      deadline:'2026-07-18T23:59:00-04:00', hint:'Locks July 18 midnight · Final on July 19'},
 ];
+
+var SCHEDULE=[
+  {stage:'group',start:'2026-06-11',end:'2026-06-27',label:'Group Stage'},
+  {stage:'r32',  start:'2026-06-28',end:'2026-07-03',label:'Round of 32'},
+  {stage:'r16',  start:'2026-07-04',end:'2026-07-09',label:'Round of 16'},
+  {stage:'qf',   start:'2026-07-10',end:'2026-07-13',label:'Quarterfinals'},
+  {stage:'sf',   start:'2026-07-14',end:'2026-07-15',label:'Semifinals'},
+  {stage:'final',start:'2026-07-18',end:'2026-07-19',label:'Final'},
+];
+
+function getCurrentStage(){
+  var today=new Date().toISOString().slice(0,10);
+  for(var i=0;i<SCHEDULE.length;i++){
+    if(today>=SCHEDULE[i].start&&today<=SCHEDULE[i].end) return SCHEDULE[i];
+  }
+  if(today<'2026-06-11') return {stage:'pre',label:'Tournament starts June 11',active:false};
+  if(today>'2026-07-19') return {stage:'done',label:'Tournament complete',active:false};
+  return {stage:'rest',label:'Rest day',active:false};
+}
+
+function deadlineBadge(isoDeadline){
+  var now=new Date(), d=new Date(isoDeadline), diff=d-now;
+  var dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'America/New_York'});
+  if(diff<=0) return {text:'Deadline passed',color:C.red};
+  var hours=Math.floor(diff/3600000), days=Math.floor(hours/24);
+  if(days>7)  return {text:'Closes '+dateStr,         color:C.dim};
+  if(days>=2) return {text:'Closes in '+days+' days', color:C.dim};
+  if(days>=1) return {text:'⚠ Closes tomorrow!',      color:C.gold};
+  return           {text:'🚨 Closes in '+hours+'h!',   color:C.red};
+}
 
 var BONUS_QUESTIONS=[
   // Pre-Tournament — The Big Calls
@@ -684,21 +714,48 @@ function getLastResult(player,matches){
 function Leaderboard(p){
   var matches=p.state.matches||[];
   var pts=calcPts(p.state.players,matches);
+  var bonusLocked=p.state.bonusLocked||{};
   var ranked=[].concat(p.state.players).sort(function(a,b){return (pts[b.name]||0)-(pts[a.name]||0);});
   var _r=useState(false),rfsh=_r[0],setRfsh=_r[1];
   var _m=useState(null),modal=_m[0],setModal=_m[1];
   function doRefresh(){setRfsh(true);p.onRef();setTimeout(function(){setRfsh(false);},600);}
+
+  // Schedule awareness
+  var stage=getCurrentStage();
+  var urgentDeadlines=BONUS_PHASES.filter(function(ph){
+    if(bonusLocked[ph.id]) return false;
+    var diff=new Date(ph.deadline)-new Date();
+    return diff>0&&diff<48*3600000;
+  });
+
   return html`<div style=${S.page}>
     ${modal&&html`<${TeamModal} team=${modal.team} owner=${modal.owner} matches=${matches} onClose=${function(){setModal(null);}}/>`}
     <${Hdr} sub="TOURNAMENT LEADERBOARD"
       right=${html`<button onClick=${doRefresh} style=${{background:'none',border:'none',cursor:'pointer',color:rfsh?C.gold:C.dim,fontSize:20,padding:0}}>↻</button>`}/>
     <${TabBar} view="standings" onSwitch=${p.onSwitchView}/>
+
+    <!-- Schedule banners -->
+    ${stage.stage!=='pre'&&stage.stage!=='done'&&html`<div style=${{background:C.deep,borderBottom:'1px solid '+C.faint,padding:'8px 16px',display:'flex',alignItems:'center',gap:8}}>
+      <span style=${{fontSize:14}}>📅</span>
+      <span style=${{fontFamily:F.cond,fontSize:12,color:C.gold}}>${stage.label} in progress</span>
+      ${p.isC&&html`<span style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:4}}>· Update Results to keep scores current</span>`}
+    </div>`}
+    ${urgentDeadlines.map(function(ph){
+      var b=deadlineBadge(ph.deadline);
+      return html`<div key=${ph.id} style=${{background:'rgba(245,197,24,0.1)',borderBottom:'1px solid '+C.gold,padding:'8px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <span style=${{fontFamily:F.cond,fontWeight:700,fontSize:12,color:C.gold}}>⚠ ${ph.label} picks</span>
+          <span style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginLeft:6}}>${b.text}</span>
+        </div>
+        <button onClick=${function(){p.onSwitchView('bonus');}} style=${S.btn('gold',{fontSize:11,padding:'4px 10px'})}>Submit Now</button>
+      </div>`;
+    })}
     <div style=${{maxWidth:600,margin:'0 auto',padding:16}}>
       ${p.isC&&html`<div style=${{display:'flex',gap:8,marginBottom:16}}>
         <button style=${{...S.btn('gold'),flex:1}} onClick=${p.onManage}>📋 Update Results</button>
       </div>`}
       <div style=${{fontFamily:F.cond,fontSize:11,color:C.dim,letterSpacing:'0.1em',marginBottom:10}}>
-        ${matches.length} RESULTS RECORDED · JUNE 11 – JULY 19
+        ${matches.length} RESULTS RECORDED · ${stage.label?stage.label.toUpperCase():'JUNE 11 – JULY 19'}
       </div>
 
       ${ranked.map(function(pl,i){
@@ -1150,6 +1207,7 @@ function BonusPicksScreen(p){
         var submitted=phaseQs.filter(function(q){return myPicks[q.id];}).length;
         var isOpen=openPhase===ph.id;
         var cats=[...new Set(phaseQs.map(function(q){return q.cat;}))];
+        var badge=locked?null:deadlineBadge(ph.deadline);
 
         return html`<div key=${ph.id} style=${{...S.card({padding:0}),marginBottom:10,overflow:'hidden',border:'1px solid '+(locked?C.faint:C.gold)}}>
           <!-- Phase header -->
@@ -1160,9 +1218,10 @@ function BonusPicksScreen(p){
             <div>
               <div style=${{fontFamily:F.cond,fontWeight:700,fontSize:15,color:locked?C.dim:C.white}}>${ph.label}</div>
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:2}}>
-                ${locked?'🔒 Locked':('Open · '+ph.hint)}
-                ${!locked&&submitted>0?html`<span style=${{color:C.gold,marginLeft:8}}>${submitted}/${phaseQs.length} submitted</span>`:''}
+                ${locked?'🔒 Locked':ph.hint}
               </div>
+              ${badge&&html`<div style=${{fontFamily:F.cond,fontSize:11,color:badge.color,marginTop:3,fontWeight:700}}>${badge.text}</div>`}
+              ${!locked&&submitted>0?html`<div style=${{fontFamily:F.cond,fontSize:11,color:C.gold,marginTop:2}}>${submitted}/${phaseQs.length} answered</div>`:''}
             </div>
             <span style=${{color:C.gold}}>${isOpen?'▲':'▼'}</span>
           </div>
@@ -1280,6 +1339,7 @@ function BonusAdminScreen(p){
           var picks=bonusPicks[pl.name]||{};
           return phaseQs.some(function(q){return picks[q.id];});
         }).length;
+        var badge=locked?null:deadlineBadge(ph.deadline);
 
         return html`<div key=${ph.id} style=${{...S.card({padding:'14px 16px',marginBottom:10}),border:'1px solid '+(locked?C.faint:C.gold)}}>
           <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -1288,6 +1348,7 @@ function BonusAdminScreen(p){
               <div style=${{fontFamily:F.body,fontSize:11,color:C.dim,marginTop:2}}>
                 ${submissions} of ${p.state.players.length} players submitted picks
               </div>
+              ${badge&&html`<div style=${{fontFamily:F.cond,fontSize:11,color:badge.color,marginTop:3,fontWeight:700}}>${badge.text}</div>`}
             </div>
             <button onClick=${function(){toggleLock(ph.id);}}
               style=${S.btn(locked?'ghost':'gold',{fontSize:12,padding:'6px 14px'})}>
